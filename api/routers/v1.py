@@ -41,8 +41,8 @@ class RegionDistribution(BaseModel):
     count: int
 
 
-@router.get("/matches-region-distribution")
-def get_matches_region_distribution() -> list[RegionDistribution]:
+@router.get("/match-region-distribution")
+def get_match_region_distribution() -> list[RegionDistribution]:
     query = """
     SELECT region_mode, COUNT(DISTINCT match_id) as count
     FROM active_matches
