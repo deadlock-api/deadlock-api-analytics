@@ -23,7 +23,7 @@ async def add_cache_headers(request: Request, call_next):
     is_docs = request.url.path.replace("/", "").startswith("docs")
     is_health = request.url.path.replace("/", "").startswith("health")
     if is_success and not is_docs and not is_health:
-        response.headers["Cache-Control"] = "public, max-age=600"
+        response.headers["Cache-Control"] = "public, max-age=1200"
     return response
 
 
