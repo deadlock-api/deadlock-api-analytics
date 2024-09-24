@@ -14,4 +14,4 @@ def get_match_score_distribution():
     ORDER BY match_score;
     """
     result = CH_CLIENT.execute(query)
-    return [{"match_score": row[0], "match_score_count": row[1]} for row in result]
+    return [{"match_score": row[0], "count": row[1]} for row in result]
