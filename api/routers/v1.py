@@ -13,4 +13,5 @@ def get_match_score_distribution():
     GROUP BY match_score
     ORDER BY match_score;
     """
-    return CH_CLIENT.execute(query)
+    result = CH_CLIENT.execute(query)
+    return [{"match_score": row[0], "match_score_count": row[1]} for row in result]
