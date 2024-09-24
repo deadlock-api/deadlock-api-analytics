@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 
@@ -12,6 +13,8 @@ app = FastAPI(
     title="Deadlock Analytics API",
     description="API for Deadlock analytics, including match, player, hero and item statistics.",
 )
+
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 app.include_router(v1.router)
 

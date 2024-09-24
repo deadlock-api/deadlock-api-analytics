@@ -10,6 +10,7 @@ python = "^3.12"
 fastapi = "^0.115.0"
 clickhouse-driver = "^0.2.9"
 uvicorn = "^0.30.6"
+prometheus-fastapi-instrumentator = "^7.0.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
