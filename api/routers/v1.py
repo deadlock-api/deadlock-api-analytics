@@ -26,3 +26,15 @@ def get_match_score_distribution(hero_ids: list[int] | None = Query(None)):
         """
         result = CH_CLIENT.execute(query, {"hero_ids": hero_ids})
     return [{"match_score": row[0], "count": row[1]} for row in result]
+
+
+@router.get("/matches-region-distribution")
+def get_matches_region_distribution():
+    query = """
+    SELECT region_mode, COUNT(DISTINCT match_id) as count
+    FROM active_matches
+    GROUP BY region_mode
+    ORDER BY region_mode;
+    """
+    result = CH_CLIENT.execute(query)
+    return [{"region": row[0], "count": row[1]} for row in result]
