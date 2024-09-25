@@ -37,7 +37,7 @@ def get_match_score_distribution(
 
 
 class RegionDistribution(BaseModel):
-    region: int
+    region: str
     count: int
 
 
