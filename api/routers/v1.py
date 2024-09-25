@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from fastapi.openapi.models import APIKey
 from pydantic import BaseModel
 
+from api import utils
 from api.globs import CH_POOL
 
 router = APIRouter(prefix="/v1")
@@ -54,3 +56,28 @@ def get_match_region_distribution() -> list[RegionDistribution]:
     with CH_POOL.get_client() as client:
         result = client.execute(query)
     return [RegionDistribution(region=row[0], count=row[1]) for row in result]
+
+
+class HeroWinLossStat(BaseModel):
+    hero_id: int
+    wins: int
+    losses: int
+
+
+@router.get("/hero-win-loss-stats", tags=["Private (API-Key only)"])
+def get_hero_win_loss_stats(
+    api_key: APIKey = Depends(utils.get_api_key),
+) -> list[HeroWinLossStat]:
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT `players.hero_id`                  as hero_id,
+            countIf(`players.team` == winner) AS wins,
+            countIf(`players.team` != winner) AS losses
+    FROM finished_matches
+            ARRAY JOIN players
+    GROUP BY `players.hero_id`
+    ORDER BY wins + losses DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
+    return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
