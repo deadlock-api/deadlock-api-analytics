@@ -1,8 +1,8 @@
 import os
 
-import clickhouse_driver
+from clickhouse_pool import ChPool
 
-CH_CLIENT = clickhouse_driver.Client(
+CH_POOL = ChPool(
     host=os.getenv("CLICKHOUSE_HOST", "localhost"),
     port=int(os.getenv("CLICKHOUSE_PORT", 9000)),
     user=os.getenv("CLICKHOUSE_USER", "default"),
