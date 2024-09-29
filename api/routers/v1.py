@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel
+from starlette.responses import Response
 
 from api import utils
 from api.globs import CH_POOL
@@ -15,8 +16,10 @@ class MatchScoreDistribution(BaseModel):
 
 @router.get("/match-score-distribution")
 def get_match_score_distribution(
+    response: Response,
     hero_ids: list[int] | None = Query(None),
 ) -> list[MatchScoreDistribution]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
     if hero_ids is None:
         query = """
         SELECT match_score, COUNT(DISTINCT match_id) as match_score_count
@@ -46,7 +49,8 @@ class RegionDistribution(BaseModel):
 
 
 @router.get("/match-region-distribution")
-def get_match_region_distribution() -> list[RegionDistribution]:
+def get_match_region_distribution(response: Response) -> list[RegionDistribution]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT region_mode, COUNT(DISTINCT match_id) as count
     FROM active_matches
@@ -66,8 +70,10 @@ class HeroWinLossStat(BaseModel):
 
 @router.get("/hero-win-loss-stats", tags=["Private (API-Key only)"])
 def get_hero_win_loss_stats(
+    response: Response,
     api_key: APIKey = Depends(utils.get_api_key),
 ) -> list[HeroWinLossStat]:
+    response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT `players.hero_id`                  as hero_id,
