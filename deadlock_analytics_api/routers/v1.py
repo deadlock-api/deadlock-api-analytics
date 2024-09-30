@@ -1,10 +1,9 @@
+from deadlock_analytics_api import utils
+from deadlock_analytics_api.globs import CH_POOL
 from fastapi import APIRouter, Depends, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel
 from starlette.responses import Response
-
-from api import utils
-from api.globs import CH_POOL
 
 router = APIRouter(prefix="/v1")
 

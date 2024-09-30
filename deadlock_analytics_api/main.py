@@ -1,10 +1,9 @@
 import logging
 
+from deadlock_analytics_api.routers import v1
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.responses import RedirectResponse
-
-from api.routers import v1
 
 logging.basicConfig(level=logging.INFO)
 
