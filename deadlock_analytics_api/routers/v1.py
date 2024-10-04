@@ -5,6 +5,7 @@ from deadlock_analytics_api.globs import CH_POOL
 from fastapi import APIRouter, Depends, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 router = APIRouter(prefix="/v1")
@@ -98,10 +99,8 @@ class MatchScore(BaseModel):
 
 @router.get("/matches/{match_id}/score", tags=["Private (API-Key only)"])
 def get_match_scores(
-    response: Response,
-    match_id: int,
-    api_key: APIKey = Depends(utils.get_api_key),
-) -> MatchScore | None:
+    response: Response, match_id: int, api_key: APIKey = Depends(utils.get_api_key)
+) -> MatchScore:
     response.headers["Cache-Control"] = "public, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
@@ -113,6 +112,6 @@ def get_match_scores(
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"match_id": match_id})
     if len(result) == 0:
-        return None
+        raise HTTPException(status_code=404, detail="Match not found")
     result = result[0]
     return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
