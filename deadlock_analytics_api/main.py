@@ -4,12 +4,20 @@ from deadlock_analytics_api.routers import v1
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="Deadlock Analytics API",
     description="API for Deadlock analytics, including match, player, hero and item statistics.",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
