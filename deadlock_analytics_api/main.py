@@ -2,9 +2,9 @@ import logging
 
 from deadlock_analytics_api.routers import v1
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.responses import RedirectResponse
-from fastapi.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
