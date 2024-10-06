@@ -70,13 +70,9 @@ class HeroWinLossStat(BaseModel):
     losses: int
 
 
-@router.get("/hero-win-loss-stats", tags=["Private (API-Key only)"])
-def get_hero_win_loss_stats(
-    response: Response,
-    api_key: APIKey = Depends(utils.get_api_key),
-) -> list[HeroWinLossStat]:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
+@router.get("/hero-win-loss-stats")
+def get_hero_win_loss_stats(response: Response) -> list[HeroWinLossStat]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT `players.hero_id`                  as hero_id,
             countIf(`players.team` == winner) AS wins,
