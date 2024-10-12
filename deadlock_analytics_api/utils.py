@@ -11,3 +11,11 @@ async def get_api_key(api_key_query: str = Security(api_key_query)):
     if api_key_query in available_api_keys:
         return api_key_query
     raise HTTPException(status_code=HTTP_403_FORBIDDEN)
+
+
+async def get_internal_api_key(api_key_query: str = Security(api_key_query)):
+    with open("internal_api_keys.txt") as f:
+        available_api_keys = f.read().splitlines()
+    if api_key_query in available_api_keys:
+        return api_key_query
+    raise HTTPException(status_code=HTTP_403_FORBIDDEN)

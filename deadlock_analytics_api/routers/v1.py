@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 router = APIRouter(prefix="/v1")
 
@@ -97,7 +97,7 @@ class MatchScore(BaseModel):
 def get_match_scores(
     response: Response, match_id: int, api_key: APIKey = Depends(utils.get_api_key)
 ) -> MatchScore:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+    response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT start_time, match_id, match_score
@@ -111,3 +111,26 @@ def get_match_scores(
         raise HTTPException(status_code=404, detail="Match not found")
     result = result[0]
     return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
+
+
+@router.get(
+    "/matches/by-account-id/{account_id}", tags=["Internal (Internal API-Key only)"]
+)
+def get_matches_by_account_id(
+    response: Response,
+    account_id: int,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> JSONResponse:
+    response.headers["Cache-Control"] = "private, max-age=86400"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT *
+    FROM finished_matches
+    ARRAY JOIN players
+    WHERE players.account_id = %(account_id)s
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return JSONResponse(content=result)
