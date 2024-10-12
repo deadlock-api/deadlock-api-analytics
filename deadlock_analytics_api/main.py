@@ -10,8 +10,14 @@ from starlette.responses import RedirectResponse
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
-    title="Deadlock Analytics API",
-    description="API for Deadlock analytics, including match, player, hero and item statistics.",
+    title="Analytics - Deadlock API",
+    description="""
+Part of the [https://deadlock-api.com](https://deadlock-api.com) project.
+
+API for Deadlock analytics, including match, player, hero and item statistics.
+
+_deadlock-api.com is not endorsed by Valve and does not reflect the views or opinions of Valve or anyone officially involved in producing or managing Valve properties. Valve and all associated properties are trademarks or registered trademarks of Valve Corporation_
+""",
 )
 
 app.add_middleware(
