@@ -164,9 +164,11 @@ class MatchScore(BaseModel):
     match_score: int
 
 
-@router.get("/matches/{match_id}/score", tags=["Private (API-Key only)"])
+@router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
 def get_match_scores(
-    response: Response, match_id: int, api_key: APIKey = Depends(utils.get_api_key)
+    response: Response,
+    match_id: int,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> MatchScore:
     response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
@@ -184,9 +186,7 @@ def get_match_scores(
     return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
 
 
-@router.get(
-    "/matches/by-account-id/{account_id}", tags=["Internal (Internal API-Key only)"]
-)
+@router.get("/matches/by-account-id/{account_id}", tags=["Internal API-Key required"])
 def get_matches_by_account_id(
     response: Response,
     account_id: int,
