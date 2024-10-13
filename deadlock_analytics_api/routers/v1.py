@@ -128,7 +128,8 @@ def get_player_rank(
 
 class PlayerMMRHistoryEntry(BaseModel):
     account_id: int
-    game_start_time: str
+    match_id: int
+    match_start_time: str
     player_score: int
 
 
@@ -172,7 +173,8 @@ def get_player_mmr_history(
     return [
         PlayerMMRHistoryEntry(
             account_id=r[0],
-            game_start_time=match_id_start_time[r[1]].isoformat(),
+            match_id=r[1],
+            match_start_time=match_id_start_time[r[1]].isoformat(),
             player_score=r[2],
         )
         for r in result
@@ -222,33 +224,9 @@ class MatchScore(BaseModel):
     match_score: int
 
 
-@router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
-def get_match_scores(
-    response: Response,
-    match_id: int,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
-) -> MatchScore:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
-    query = """
-    SELECT start_time, match_id, match_score
-    FROM active_matches
-    WHERE match_id = %(match_id)s
-    LIMIT 1
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"match_id": match_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Match not found")
-    result = result[0]
-    return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
-
-
-@router.get("/matches/by-account-id/{account_id}", tags=["Internal API-Key required"])
+@router.get("/matches/by-account-id/{account_id}", tags=["Private (API-Key only)"])
 def get_matches_by_account_id(
-    response: Response,
-    account_id: int,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
+    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
 ) -> JSONResponse:
     response.headers["Cache-Control"] = "private, max-age=86400"
     print(f"Authenticated with API key: {api_key}")
@@ -326,3 +304,25 @@ def get_matches_by_account_id(
         for row in result
     ]
     return JSONResponse(content=result)
+
+
+@router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
+def get_match_scores(
+    response: Response,
+    match_id: int,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> MatchScore:
+    response.headers["Cache-Control"] = "private, max-age=1200"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT start_time, match_id, match_score
+    FROM active_matches
+    WHERE match_id = %(match_id)s
+    LIMIT 1
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"match_id": match_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Match not found")
+    result = result[0]
+    return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
