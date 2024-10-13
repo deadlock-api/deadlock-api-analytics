@@ -3,9 +3,9 @@ from typing import Annotated
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, Response
 
@@ -89,7 +89,7 @@ def get_hero_win_loss_stats(response: Response) -> list[HeroWinLossStat]:
 
 
 class PlayerLeaderboard(BaseModel):
-    account_id: int
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
     leaderboard_rank: int
 
@@ -111,7 +111,12 @@ Ranks update in 1min intervals.
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
 )
-def get_player_rank(response: Response, account_id: int) -> PlayerLeaderboard:
+def get_player_rank(
+    response: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> PlayerLeaderboard:
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT leaderboard.*
@@ -129,7 +134,7 @@ def get_player_rank(response: Response, account_id: int) -> PlayerLeaderboard:
 
 
 class PlayerMMRHistoryEntry(BaseModel):
-    account_id: int
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
     match_id: int
     match_start_time: str
     player_score: int
@@ -153,7 +158,10 @@ As the calculation uses the match_score, it updates when a player starts a new m
 """,
 )
 def get_player_mmr_history(
-    response: Response, account_id: int
+    response: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
 ) -> list[PlayerMMRHistoryEntry]:
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
