@@ -167,7 +167,7 @@ def get_player_mmr_history(
     query = """
     SELECT account_id, match_id, ROUND(player_score)
     FROM mmr_history
-    WHERE account_id = 7695
+    WHERE account_id = %(account_id)s
     ORDER BY match_id DESC;
     """
     with CH_POOL.get_client() as client:
