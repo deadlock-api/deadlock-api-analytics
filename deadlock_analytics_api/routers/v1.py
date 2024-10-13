@@ -289,6 +289,55 @@ def get_leaderboard_by_region(
     ]
 
 
+class HeroLeaderboard(BaseModel):
+    hero_id: int
+    account_id: int
+    wins: int
+    total: int
+
+
+@router.get(
+    "/hero-leaderboard/{hero_id}",
+    description="""
+# ⚠️ Use with Responsibility ⚠️
+
+As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
+
+Ranks update in 10min intervals.
+""",
+)
+def get_hero_leaderboard(
+    response: Response,
+    hero_id: int,
+    min_total_games: Annotated[int, Query(ge=10)] = 10,
+    start: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(le=100)] = 100,
+) -> list[HeroLeaderboard]:
+    response.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT *
+    FROM hero_player_winrate
+    WHERE total >= %(min_total_games)s AND hero_id = %(hero_id)s
+    ORDER BY wins / total DESC
+    LIMIT %(limit)s
+    OFFSET %(start)s;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "start": start - 1,
+                "limit": limit,
+                "hero_id": hero_id,
+                "min_total_games": min_total_games,
+            },
+        )
+    return [
+        HeroLeaderboard(hero_id=r[0], account_id=r[1], wins=r[2], total=r[3])
+        for r in result
+    ]
+
+
 class MatchScore(BaseModel):
     start_time: datetime.datetime
     match_id: int
