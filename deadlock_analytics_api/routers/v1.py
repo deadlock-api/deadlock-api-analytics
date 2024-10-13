@@ -1,4 +1,5 @@
 import datetime
+from typing import Annotated
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
@@ -85,6 +86,69 @@ def get_hero_win_loss_stats(response: Response) -> list[HeroWinLossStat]:
     with CH_POOL.get_client() as client:
         result = client.execute(query)
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+
+
+class PlayerLeaderboard(BaseModel):
+    account_id: int
+    player_score: int
+    leaderboard_rank: int
+
+
+@router.get(
+    "/players/{account_id}/rank",
+    description="""
+Get the rank of a player by their account ID.
+
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
+It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+""",
+)
+def get_player_rank(response: Response, account_id: int) -> PlayerLeaderboard:
+    response.headers["Cache-Control"] = "public, max-age=1200"
+    query = """
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
+    FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
+    WHERE account_id = %(account_id)s;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    result = result[0]
+    return PlayerLeaderboard(
+        account_id=result[0], player_score=int(result[1]), leaderboard_rank=result[2]
+    )
+
+
+@router.get(
+    "/leaderboard",
+    description="""
+Get the leaderboard of all players.
+
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
+It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+""",
+)
+def get_leaderboard(
+    response: Response,
+    start: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(le=10000)] = 1000,
+) -> list[PlayerLeaderboard]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
+    query = """
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
+    FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
+    LIMIT %(limit)s
+    OFFSET %(start)s;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"start": start - 1, "limit": limit})
+    return [
+        PlayerLeaderboard(
+            account_id=r[0], player_score=int(r[1]), leaderboard_rank=r[2]
+        )
+        for r in result
+    ]
 
 
 class MatchScore(BaseModel):

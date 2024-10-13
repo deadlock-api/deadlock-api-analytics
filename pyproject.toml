@@ -15,6 +15,10 @@ clickhouse-pool = "^0.6.0"
 [tool.poetry.group.dev.dependencies]
 black = "^24.8.0"
 
+
+[tool.poetry.group.mmr.dependencies]
+tqdm = "^4.66.5"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
