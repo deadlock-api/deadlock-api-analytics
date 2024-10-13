@@ -1,5 +1,5 @@
 import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
@@ -227,6 +227,60 @@ def get_leaderboard(
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"start": start - 1, "limit": limit})
+    return [
+        PlayerLeaderboard(
+            account_id=r[0], player_score=int(r[1]), leaderboard_rank=r[2]
+        )
+        for r in result
+    ]
+
+
+@router.get(
+    "/leaderboard/{region}",
+    description="""
+# ⚠️ Use with Responsibility ⚠️
+
+As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
+
+# Description
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
+It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+With this algorithm we match the Glicko rating system used in the game very closely.
+
+Ranks update in 1min intervals.
+
+As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
+""",
+)
+def get_leaderboard_by_region(
+    response: Response,
+    region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
+    start: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(le=10000)] = 1000,
+) -> list[PlayerLeaderboard]:
+    response.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    WITH leaderboard AS (
+        SELECT account_id, player_score
+        FROM mmr_history
+        WHERE account_id IN (
+            SELECT account_id
+            FROM player_region
+            WHERE region_mode = %(region)s
+        )
+        ORDER BY account_id, match_id DESC
+        LIMIT 1 BY account_id
+    )
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score) AS player_score, ROW_NUMBER() OVER (ORDER BY leaderboard.player_score DESC) AS rank
+    FROM leaderboard
+    ORDER BY rank
+    LIMIT %(limit)s
+    OFFSET %(start)s;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query, {"start": start - 1, "limit": limit, "region": region}
+        )
     return [
         PlayerLeaderboard(
             account_id=r[0], player_score=int(r[1]), leaderboard_rank=r[2]
