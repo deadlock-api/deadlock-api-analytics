@@ -97,20 +97,22 @@ class PlayerLeaderboard(BaseModel):
 @router.get(
     "/players/{account_id}/rank",
     description="""
-Get the rank of a player by their account ID.
+# ⚠️ Use with Responsibility ⚠️
 
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
+As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
+
+# Description
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+With this algorithm we match the Glicko rating system used in the game very closely.
 
-As the calculation uses the match_score, it updates when a player starts a new match.
+Ranks update in 1min intervals.
+
+As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
-    tags=["Private (API-Key only)"],
 )
-def get_player_rank(
-    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
-) -> PlayerLeaderboard:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
+def get_player_rank(response: Response, account_id: int) -> PlayerLeaderboard:
+    response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT leaderboard.*
     FROM (SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id)) leaderboard
@@ -136,20 +138,24 @@ class PlayerMMRHistoryEntry(BaseModel):
 @router.get(
     "/players/{account_id}/mmr-history",
     description="""
-Get the mmr-history of a player by their account ID.
+# ⚠️ Use with Responsibility ⚠️
 
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
+As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
+
+# Description
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+With this algorithm we match the Glicko rating system used in the game very closely.
 
-As the calculation uses the match_score, it updates when a player starts a new match.
+Ranks update in 1min intervals.
+
+As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
-    tags=["Private (API-Key only)"],
 )
 def get_player_mmr_history(
-    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
+    response: Response, account_id: int
 ) -> list[PlayerMMRHistoryEntry]:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
+    response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT account_id, match_id, ROUND(player_score)
     FROM mmr_history
@@ -184,23 +190,26 @@ def get_player_mmr_history(
 @router.get(
     "/leaderboard",
     description="""
-Get the leaderboard of all players.
+# ⚠️ Use with Responsibility ⚠️
 
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
+As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
+
+# Description
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+With this algorithm we match the Glicko rating system used in the game very closely.
 
-As the calculation uses the match_score, it updates when a player starts a new match.
+Ranks update in 1min intervals.
+
+As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
-    tags=["Private (API-Key only)"],
 )
 def get_leaderboard(
     response: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
-    api_key: APIKey = Depends(utils.get_api_key),
 ) -> list[PlayerLeaderboard]:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
+    response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank
     FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
@@ -224,12 +233,9 @@ class MatchScore(BaseModel):
     match_score: int
 
 
-@router.get("/matches/by-account-id/{account_id}", tags=["Private (API-Key only)"])
-def get_matches_by_account_id(
-    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
-) -> JSONResponse:
-    response.headers["Cache-Control"] = "private, max-age=86400"
-    print(f"Authenticated with API key: {api_key}")
+@router.get("/matches/by-account-id/{account_id}")
+def get_matches_by_account_id(response: Response, account_id: int) -> JSONResponse:
+    response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT *
     FROM finished_matches
