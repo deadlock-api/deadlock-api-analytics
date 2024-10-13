@@ -102,9 +102,13 @@ Get the rank of a player by their account ID.
 As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
 """,
+    tags=["Private (API-Key only)"],
 )
-def get_player_rank(response: Response, account_id: int) -> PlayerLeaderboard:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+def get_player_rank(
+    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
+) -> PlayerLeaderboard:
+    response.headers["Cache-Control"] = "private, max-age=1200"
+    print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
     FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
@@ -128,13 +132,16 @@ Get the leaderboard of all players.
 As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
 """,
+    tags=["Private (API-Key only)"],
 )
 def get_leaderboard(
     response: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
+    api_key: APIKey = Depends(utils.get_api_key),
 ) -> list[PlayerLeaderboard]:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+    response.headers["Cache-Control"] = "private, max-age=1200"
+    print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
     FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
