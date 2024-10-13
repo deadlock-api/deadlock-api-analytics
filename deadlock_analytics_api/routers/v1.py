@@ -112,9 +112,9 @@ def get_player_rank(
     response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
-    FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
-    WHERE account_id = %(account_id)s;
+    SELECT leaderboard.*
+    FROM (SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id)) leaderboard
+    WHERE leaderboard.account_id = %(account_id)s;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"account_id": account_id})
@@ -124,6 +124,59 @@ def get_player_rank(
     return PlayerLeaderboard(
         account_id=result[0], player_score=int(result[1]), leaderboard_rank=result[2]
     )
+
+
+class PlayerMMRHistoryEntry(BaseModel):
+    account_id: int
+    game_start_time: str
+    player_score: int
+
+
+@router.get(
+    "/players/{account_id}/mmr-history",
+    description="""
+Get the mmr-history of a player by their account ID.
+
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
+It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+
+As the calculation uses the match_score, it updates when a player starts a new match.
+""",
+    tags=["Private (API-Key only)"],
+)
+def get_player_mmr_history(
+    response: Response, account_id: int, api_key: APIKey = Depends(utils.get_api_key)
+) -> list[PlayerMMRHistoryEntry]:
+    response.headers["Cache-Control"] = "private, max-age=1200"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT account_id, match_id, ROUND(player_score)
+    FROM mmr_history
+    WHERE account_id = 7695
+    ORDER BY match_id DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    match_ids = [r[1] for r in result]
+    query = """
+    SELECT match_id, start_time
+    FROM active_matches
+    WHERE match_id IN %(match_ids)s
+    LIMIT 1 BY match_id;
+    """
+    with CH_POOL.get_client() as client:
+        result2 = client.execute(query, {"match_ids": match_ids})
+    match_id_start_time = {r[0]: r[1] for r in result2}
+    return [
+        PlayerMMRHistoryEntry(
+            account_id=r[0],
+            game_start_time=match_id_start_time[r[1]].isoformat(),
+            player_score=r[2],
+        )
+        for r in result
+    ]
 
 
 @router.get(
@@ -147,8 +200,9 @@ def get_leaderboard(
     response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), leaderboard.rank
-    FROM (SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank FROM player_mmr) leaderboard
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank
+    FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
+    ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
     """

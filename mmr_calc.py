@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from tqdm import tqdm
 
 DEFAULT_PLAYER_MMR = 1500
-LEARNING_RATE = 1.0
+LEARNING_RATE = 0.6
+UPDATE_INTERVAL = 60
 
 CH_POOL = ChPool(
     host=os.getenv("CLICKHOUSE_HOST", "localhost"),
@@ -26,8 +27,8 @@ class Match(BaseModel):
 
 def get_matches_starting_from(client, start_id: int = 0) -> list[Match]:
     query = f"""
-    SELECT match_id, `players.account_id`, match_score
-    FROM finished_matches
+    SELECT DISTINCT match_id, `players.account_id`, match_score
+    FROM active_matches
     WHERE match_id > {start_id} AND start_time > '2024-10-11 06:00:00'
     ORDER BY match_id;
     """
@@ -39,8 +40,8 @@ def get_matches_starting_from(client, start_id: int = 0) -> list[Match]:
 
 def get_regression_starting_id(client) -> int:
     query = """
-    SELECT max(last_updated_match_id)
-    FROM player_mmr;
+    SELECT max(match_id)
+    FROM mmr_history;
     """
     return client.execute(query)[0][0]
 
@@ -48,7 +49,9 @@ def get_regression_starting_id(client) -> int:
 def get_all_player_mmrs(client) -> dict[int, float]:
     query = f"""
     SELECT account_id, player_score
-    FROM player_mmr;
+    FROM mmr_history
+    ORDER BY account_id, match_id DESC
+    LIMIT 1 BY account_id;
     """
     result = client.execute(query)
     return {row[0]: row[1] for row in result}
@@ -56,7 +59,7 @@ def get_all_player_mmrs(client) -> dict[int, float]:
 
 def set_player_mmr(client, player_mmr: dict[int, float], match_id: int):
     query = """
-    INSERT INTO player_mmr (account_id, player_score, last_updated_match_id)
+    INSERT INTO mmr_history (account_id, match_id, player_score)
     VALUES
     """
 
@@ -65,8 +68,8 @@ def set_player_mmr(client, player_mmr: dict[int, float], match_id: int):
         [
             {
                 "account_id": account_id,
+                "match_id": match_id,
                 "player_score": mmr,
-                "last_updated_match_id": match_id,
             }
             for account_id, mmr in player_mmr.items()
         ],
@@ -93,13 +96,12 @@ if __name__ == "__main__":
             matches = get_matches_starting_from(client, starting_id)
             if len(matches) > 0:
                 all_player_mmrs = get_all_player_mmrs(client)
-                player_updated_mmr = dict()
                 for match in tqdm(matches, desc="Processing matches"):
                     updated_mmrs = run_regression(match, all_player_mmrs)
-                    player_updated_mmr.update(updated_mmrs)
-                set_player_mmr(client, player_updated_mmr, match.match_id)
+                    all_player_mmrs.update(updated_mmrs)
+                    set_player_mmr(client, updated_mmrs, match.match_id)
         end = time.time()
         duration = end - start
         print(f"Processed {len(matches)} matches in {duration:.2f} seconds")
-        if duration < 10 * 60:
-            sleep(10 * 60 - (end - start))
+        if duration < UPDATE_INTERVAL:
+            sleep(UPDATE_INTERVAL - (end - start))
