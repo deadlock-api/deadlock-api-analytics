@@ -99,8 +99,10 @@ class PlayerLeaderboard(BaseModel):
     description="""
 Get the rank of a player by their account ID.
 
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+
+As the calculation uses the match_score, it updates when a player starts a new match.
 """,
     tags=["Private (API-Key only)"],
 )
@@ -129,8 +131,10 @@ def get_player_rank(
     description="""
 Get the leaderboard of all players.
 
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of all matches ever played.
+As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches.
 It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
+
+As the calculation uses the match_score, it updates when a player starts a new match.
 """,
     tags=["Private (API-Key only)"],
 )
