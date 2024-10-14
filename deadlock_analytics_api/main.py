@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
-from starlette.responses import RedirectResponse
+from starlette.responses import PlainTextResponse, RedirectResponse
 
 logging.basicConfig(level=logging.INFO)
 
@@ -41,6 +41,11 @@ def redirect_to_docs():
 @app.get("/health", include_in_schema=False)
 def get_health():
     return {"status": "ok"}
+
+
+@app.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)
+def get_robots() -> str:
+    return "User-Agent: *\nDisallow: /\nAllow: /docs\nAllow: /\n"
 
 
 if __name__ == "__main__":
