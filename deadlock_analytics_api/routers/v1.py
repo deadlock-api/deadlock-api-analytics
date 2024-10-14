@@ -92,16 +92,12 @@ class PlayerLeaderboard(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
     leaderboard_rank: int
-    matches_played: Annotated[
-        int,
-        Field(
-            description="The number of matches played, since new match score got introduced"
-        ),
-    ]
+    matches_played: int | None = None
 
 
 @router.get(
     "/players/{account_id}/rank",
+    response_model_exclude_none=True,
     description="""
 # ⚠️ Use with Responsibility ⚠️
 
@@ -203,6 +199,7 @@ def get_player_mmr_history(
 
 @router.get(
     "/leaderboard",
+    response_model_exclude_none=True,
     description="""
 # ⚠️ Use with Responsibility ⚠️
 
@@ -246,6 +243,7 @@ def get_leaderboard(
 
 @router.get(
     "/leaderboard/{region}",
+    response_model_exclude_none=True,
     description="""
 # ⚠️ Use with Responsibility ⚠️
 
