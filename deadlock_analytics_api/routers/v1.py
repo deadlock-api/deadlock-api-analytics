@@ -92,6 +92,12 @@ class PlayerLeaderboard(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
     leaderboard_rank: int
+    matches_played: Annotated[
+        int,
+        Field(
+            description="The number of matches played, since new match score got introduced"
+        ),
+    ]
 
 
 @router.get(
@@ -219,8 +225,8 @@ def get_leaderboard(
 ) -> list[PlayerLeaderboard]:
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank
-    FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank, leaderboard.matches_played as matches_played
+    FROM (SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
     ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
@@ -229,7 +235,10 @@ def get_leaderboard(
         result = client.execute(query, {"start": start - 1, "limit": limit})
     return [
         PlayerLeaderboard(
-            account_id=r[0], player_score=int(r[1]), leaderboard_rank=r[2]
+            account_id=r[0],
+            player_score=int(r[1]),
+            leaderboard_rank=r[2],
+            matches_played=r[3],
         )
         for r in result
     ]
@@ -261,7 +270,7 @@ def get_leaderboard_by_region(
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
     WITH leaderboard AS (
-        SELECT account_id, player_score
+        SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played
         FROM mmr_history
         WHERE account_id IN (
             SELECT account_id
@@ -271,7 +280,7 @@ def get_leaderboard_by_region(
         ORDER BY account_id, match_id DESC
         LIMIT 1 BY account_id
     )
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score) AS player_score, ROW_NUMBER() OVER (ORDER BY leaderboard.player_score DESC) AS rank
+    SELECT leaderboard.account_id, ROUND(leaderboard.player_score) AS player_score, ROW_NUMBER() OVER (ORDER BY leaderboard.player_score DESC) AS rank, leaderboard.matches_played as matches_played
     FROM leaderboard
     ORDER BY rank
     LIMIT %(limit)s
@@ -283,7 +292,10 @@ def get_leaderboard_by_region(
         )
     return [
         PlayerLeaderboard(
-            account_id=r[0], player_score=int(r[1]), leaderboard_rank=r[2]
+            account_id=r[0],
+            player_score=int(r[1]),
+            leaderboard_rank=r[2],
+            matches_played=r[3],
         )
         for r in result
     ]
