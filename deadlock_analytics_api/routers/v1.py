@@ -450,3 +450,24 @@ def get_match_scores(
         raise HTTPException(status_code=404, detail="Match not found")
     result = result[0]
     return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
+
+
+@router.get("/recent-matches", tags=["Internal API-Key required"])
+def get_recent_matches(
+    response: Response,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> JSONResponse:
+    response.headers["Cache-Control"] = "private, max-age=60"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT DISTINCT match_id
+    FROM finished_matches
+    WHERE start_time < now() - INTERVAL '1 hour'
+    AND start_time > now() - INTERVAL '2 hours'
+    ORDER BY start_time
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
+    keys = ["match_id"]
+    result = [{k: col for k, col in zip(keys, row)} for row in result]
+    return JSONResponse(content=result)
