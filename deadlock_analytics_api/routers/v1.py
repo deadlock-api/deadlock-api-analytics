@@ -471,3 +471,27 @@ def get_recent_matches(
     keys = ["match_id"]
     result = [{k: col for k, col in zip(keys, row)} for row in result]
     return JSONResponse(content=result)
+
+
+class MatchSalts(BaseModel):
+    match_id: int
+    cluster_id: int
+    metadata_salt: int
+    replay_salt: int
+
+
+@router.post("/match-salts", tags=["Internal API-Key required"])
+def post_match_salts(
+    response: Response,
+    match_salts: MatchSalts,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> JSONResponse:
+    response.headers["Cache-Control"] = "private, max-age=60"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt)
+    VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s)
+    """
+    with CH_POOL.get_client() as client:
+        client.execute(query, match_salts.model_dump())
+    return JSONResponse(content={"success": True})
