@@ -463,7 +463,8 @@ def get_recent_matches(
     SELECT DISTINCT match_id
     FROM finished_matches
     WHERE start_time < now() - INTERVAL '1 hour'
-    AND start_time > now() - INTERVAL '2 hours'
+        AND start_time > now() - INTERVAL '2 hours'
+        AND match_id NOT IN (SELECT match_id FROM match_salts)
     ORDER BY start_time
     """
     with CH_POOL.get_client() as client:
