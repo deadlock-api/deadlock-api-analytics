@@ -27,12 +27,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+
 try:
     from deadlock_analytics_api.rate_limiter.limiter import RateLimitMiddleware
 
     app.add_middleware(RateLimitMiddleware)
-except:
-    print("Rate limiting middleware failed to load")
+except Exception as e:
+    print(f"Rate limiting middleware failed to load: {e}")
 
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
