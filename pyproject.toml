@@ -7,13 +7,17 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = "^0.115.0"
+fastapi = "^0.115.2"
 uvicorn = "^0.30.6"
 prometheus-fastapi-instrumentator = "^7.0.0"
 clickhouse-pool = "^0.6.0"
+redis = {version = "^5.1.1", extras = ["hiredis"]}
+psycopg2-binary = "^2.9.9"
+uuid = "^1.30"
+cachetools = "^5.5.0"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.8.0"
+black = "^24.10.0"
 
 
 [tool.poetry.group.mmr.dependencies]
