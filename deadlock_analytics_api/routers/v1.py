@@ -57,19 +57,27 @@ class HeroWinLossStat(BaseModel):
 
 
 @router.get("/hero-win-loss-stats")
-def get_hero_win_loss_stats(response: Response) -> list[HeroWinLossStat]:
+def get_hero_win_loss_stats(
+    response: Response,
+    min_match_score: Annotated[int, Query(ge=0)] = 0,
+    max_match_score: Annotated[int, Query(le=3000)] = 3000,
+) -> list[HeroWinLossStat]:
     response.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT `players.hero_id`                  as hero_id,
             countIf(`players.team` == winner) AS wins,
             countIf(`players.team` != winner) AS losses
     FROM finished_matches
-            ARRAY JOIN players
+        ARRAY JOIN players
+    WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     GROUP BY `players.hero_id`
     ORDER BY wins + losses DESC;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query)
+        result = client.execute(
+            query,
+            {"min_match_score": min_match_score, "max_match_score": max_match_score},
+        )
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
