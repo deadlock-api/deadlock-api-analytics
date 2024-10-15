@@ -18,31 +18,16 @@ class MatchScoreDistribution(BaseModel):
 
 
 @router.get("/match-score-distribution")
-def get_match_score_distribution(
-    response: Response,
-    hero_ids: list[int] | None = Query(None),
-) -> list[MatchScoreDistribution]:
+def get_match_score_distribution(response: Response) -> list[MatchScoreDistribution]:
     response.headers["Cache-Control"] = "public, max-age=1200"
-    if hero_ids is None:
-        query = """
-        SELECT match_score, COUNT(DISTINCT match_id) as match_score_count
-        FROM active_matches
-        GROUP BY match_score
-        ORDER BY match_score;
-        """
-        with CH_POOL.get_client() as client:
-            result = client.execute(query)
-    else:
-        query = """
-        SELECT match_score, COUNT(DISTINCT match_id) as count
-        FROM active_matches
-        ARRAY JOIN players
-        WHERE `players.hero_id` IN %(hero_ids)s
-        GROUP BY match_score
-        ORDER BY match_score;
-        """
-        with CH_POOL.get_client() as client:
-            result = client.execute(query, {"hero_ids": hero_ids})
+    query = """
+    SELECT match_score, COUNT(DISTINCT match_id) as match_score_count
+    FROM active_matches
+    GROUP BY match_score
+    ORDER BY match_score;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
     return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
 
 
