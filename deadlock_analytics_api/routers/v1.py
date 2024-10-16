@@ -20,16 +20,41 @@ class MatchScoreDistribution(BaseModel):
 
 @router.get("/match-score-distribution")
 def get_match_score_distribution(response: Response) -> list[MatchScoreDistribution]:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+    response.headers["Cache-Control"] = "public, max-age=3600"
     query = """
-    SELECT match_score, COUNT(DISTINCT match_id) as match_score_count
-    FROM active_matches
-    GROUP BY match_score
-    ORDER BY match_score;
+    SELECT match_score as score, COUNT(DISTINCT match_id) as match_score_count
+    FROM finished_matches
+    WHERE start_time > '2024-10-11 06:00:00'
+    GROUP BY score
+    ORDER BY score;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
     return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
+
+
+class PlayerScoreDistribution(BaseModel):
+    player_score: int
+    count: int
+
+
+@router.get("/player-score-distribution")
+def get_player_score_distribution(
+    response: Response, mode: Literal["all", "Ranked", "Unranked"] = "all"
+) -> list[PlayerScoreDistribution]:
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    query = """
+    SELECT ROUND(player_score) as score, COUNT(DISTINCT account_id) as match_score_count
+    FROM mmr_history
+    WHERE score > 400 AND (%(mode)s IS NULL OR match_mode = %(mode)s)
+    GROUP BY score
+    ORDER BY score;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"mode": mode if mode != "all" else None})
+    return [
+        PlayerScoreDistribution(player_score=row[0], count=row[1]) for row in result
+    ]
 
 
 class RegionDistribution(BaseModel):
