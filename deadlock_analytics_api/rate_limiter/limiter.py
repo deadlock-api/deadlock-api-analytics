@@ -149,7 +149,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             RateLimit(limit=100, period=60 * 60),
                         ),
                     ]
-                    if request.url.path.endswith("timestamps")
+                    if "by-account-id" in request.url.path
                     else []
                 )
             ]
@@ -166,7 +166,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             RateLimit(limit=100, period=60 * 60),
                         ),
                     ]
-                    if request.url.path.startswith("/matches/by-account-id")
+                    if "by-account-id" in request.url.path
                     else []
                 )
             ]
