@@ -574,7 +574,7 @@ class MatchSalts(BaseModel):
     replay_salt: int
 
 
-@router.get("/matches/{match_id}/match-salts", tags=["Internal API-Key required"])
+@router.get("/matches/{match_id}/salts", tags=["Internal API-Key required"])
 def get_match_salts(
     response: Response,
     match_id: int,
