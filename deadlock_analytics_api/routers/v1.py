@@ -61,11 +61,17 @@ def get_hero_win_loss_stats(
     response: Response,
     min_match_score: Annotated[int | None, Query(ge=0)] = None,
     max_match_score: Annotated[int | None, Query(le=3000)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
 ) -> list[HeroWinLossStat]:
     if min_match_score is None:
         min_match_score = 0
     if max_match_score is None:
         max_match_score = 3000
+    if min_unix_timestamp is None:
+        min_unix_timestamp = 0
+    if max_unix_timestamp is None:
+        max_unix_timestamp = 4070908800
     response.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT `players.hero_id`                  as hero_id,
@@ -74,13 +80,19 @@ def get_hero_win_loss_stats(
     FROM finished_matches
         ARRAY JOIN players
     WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
+    AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
     GROUP BY `players.hero_id`
     ORDER BY wins + losses DESC;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(
             query,
-            {"min_match_score": min_match_score, "max_match_score": max_match_score},
+            {
+                "min_match_score": min_match_score,
+                "max_match_score": max_match_score,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+            },
         )
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
