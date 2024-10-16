@@ -1,4 +1,29 @@
+import datetime
+
 from pydantic import BaseModel, ConfigDict, computed_field
+
+ACTIVE_MATCHES_KEYS = [
+    "`players.team`",
+    "`players.account_id`",
+    "`players.abandoned`",
+    "`players.hero_id`",
+    "start_time",
+    "winning_team",
+    "match_id",
+    "lobby_id",
+    "net_worth_team_0",
+    "net_worth_team_1",
+    "duration_s",
+    "spectators",
+    "open_spectator_slots",
+    "objectives_mask_team0",
+    "objectives_mask_team1",
+    "match_mode",
+    "game_mode",
+    "match_score",
+    "region_mode",
+    "scraped_at",
+]
 
 
 class ActiveMatchPlayer(BaseModel):
@@ -81,3 +106,24 @@ class ActiveMatch(BaseModel):
     @property
     def objectives_team1(self) -> ActiveMatchObjectives | None:
         return ActiveMatchObjectives.from_mask(self.objectives_mask_team1)
+
+    @classmethod
+    def from_row(cls, row) -> "ActiveMatch":
+        return cls(
+            **{
+                k: col if not isinstance(col, datetime.datetime) else col.isoformat()
+                for k, col in zip(ACTIVE_MATCHES_KEYS, row)
+                if not "players" in k
+            },
+            players=[
+                ActiveMatchPlayer(
+                    account_id=account_id,
+                    team=team,
+                    abandoned=abandoned,
+                    hero_id=hero_id,
+                )
+                for team, account_id, abandoned, hero_id in zip(
+                    row[0], row[1], row[2], row[3]
+                )
+            ],
+        )

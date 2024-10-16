@@ -3,7 +3,11 @@ from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models import ActiveMatch, ActiveMatchPlayer
+from deadlock_analytics_api.models import (
+    ACTIVE_MATCHES_KEYS,
+    ActiveMatch,
+    ActiveMatchPlayer,
+)
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
@@ -444,62 +448,83 @@ def get_matches_by_account_id(response: Response, account_id: int) -> JSONRespon
 
 
 @router.get(
+    "/matches/search",
+    summary="RateLimit: 10req/min 50req/hour, Apply for an API-Key to get higher limits",
+)
+def match_search(
+    response: Response,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: Annotated[int | None, Query(le=999999999)] = None,
+    min_match_score: Annotated[int | None, Query(ge=0)] = None,
+    max_match_score: Annotated[int | None, Query(le=3000)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
+    hero_id: int | None = None,
+) -> list[ActiveMatch]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
+    if min_unix_timestamp is None:
+        min_unix_timestamp = 0
+    if max_unix_timestamp is None:
+        max_unix_timestamp = 4070908800
+    if min_match_id is None:
+        min_match_id = 0
+    if max_match_id is None:
+        max_match_id = 999999999
+    if min_match_score is None:
+        min_match_score = 0
+    if max_match_score is None:
+        max_match_score = 3000
+    query = f"""
+    SELECT DISTINCT ON(match_id) {", ".join(ACTIVE_MATCHES_KEYS)}
+    FROM finished_matches
+    WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
+    AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
+    AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
+    AND (%(region)s IS NULL OR region_mode = %(region)s)
+    AND (%(hero_id)s IS NULL OR has(`players.hero_id`, %(hero_id)s))
+    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
+    ORDER BY match_id
+    LIMIT %(limit)s
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_match_score": min_match_score,
+                "max_match_score": max_match_score,
+                "limit": limit,
+                "region": region,
+                "hero_id": hero_id,
+                "match_mode": match_mode,
+            },
+        )
+    return [ActiveMatch.from_row(row) for row in result]
+
+
+@router.get(
     "/matches/{match_id}/timestamps",
     summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key to get higher limits",
 )
 def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     response.headers["Cache-Control"] = "public, max-age=1200"
-    keys = [
-        "`players.team`",
-        "`players.account_id`",
-        "`players.abandoned`",
-        "`players.hero_id`",
-        "start_time",
-        "winning_team",
-        "match_id",
-        "lobby_id",
-        "net_worth_team_0",
-        "net_worth_team_1",
-        "duration_s",
-        "spectators",
-        "open_spectator_slots",
-        "objectives_mask_team0",
-        "objectives_mask_team1",
-        "match_mode",
-        "game_mode",
-        "match_score",
-        "region_mode",
-        "scraped_at",
-    ]
     query = f"""
-    SELECT DISTINCT ON(scraped_at) {", ".join(keys)}
+    SELECT DISTINCT ON(scraped_at) {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM active_matches
     WHERE match_id = %(match_id)s
     ORDER BY scraped_at
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"match_id": match_id})
-    return [
-        ActiveMatch(
-            **{
-                k: col if not isinstance(col, datetime.datetime) else col.isoformat()
-                for k, col in zip(keys, row)
-                if not "players" in k
-            },
-            players=[
-                ActiveMatchPlayer(
-                    account_id=account_id,
-                    team=team,
-                    abandoned=abandoned,
-                    hero_id=hero_id,
-                )
-                for team, account_id, abandoned, hero_id in zip(
-                    row[0], row[1], row[2], row[3]
-                )
-            ],
-        )
-        for row in result
-    ]
+    return [ActiveMatch.from_row(row) for row in result]
 
 
 @router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
