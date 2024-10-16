@@ -86,6 +86,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         f"{api_key}:{limit.path or 'default'}", limit
                     )
                     for limit in RateLimitMiddleware.get_limits_by_api_key(api_key)
+                ] + [  # path param matching isn't implemented yet
+                    i
+                    for i in (
+                        [
+                            await RateLimitMiddleware.limit_by_key(
+                                f"{api_key}:timestamps", RateLimit(limit=10, period=60)
+                            ),
+                            await RateLimitMiddleware.limit_by_key(
+                                f"{api_key}:timestamps",
+                                RateLimit(limit=100, period=60 * 60),
+                            ),
+                        ]
+                        if request.url.path.endswith("timestamps")
+                        else []
+                    )
                 ]
             except InvalidAPIKey:
                 print(f"Invalid API key: {api_key}, falling back to IP rate limits")
@@ -99,6 +114,20 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
             for limit in RATE_LIMITS.get("ip", {})
             if limit.path is None or request.url.path == limit.path
+        ] + [  # path param matching isn't implemented yet
+            i
+            for i in (
+                [
+                    await RateLimitMiddleware.limit_by_key(
+                        f"{api_key}:timestamps", RateLimit(limit=10, period=60)
+                    ),
+                    await RateLimitMiddleware.limit_by_key(
+                        f"{api_key}:timestamps", RateLimit(limit=100, period=60 * 60)
+                    ),
+                ]
+                if request.url.path.endswith("timestamps")
+                else []
+            )
         ]
 
     @staticmethod

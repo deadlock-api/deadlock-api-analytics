@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
+from deadlock_analytics_api.models import ActiveMatch, ActiveMatchPlayer
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
@@ -440,6 +441,65 @@ def get_matches_by_account_id(response: Response, account_id: int) -> JSONRespon
         for row in result
     ]
     return JSONResponse(content=result)
+
+
+@router.get(
+    "/matches/{match_id}/timestamps",
+    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key to get higher limits",
+)
+def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
+    response.headers["Cache-Control"] = "public, max-age=1200"
+    keys = [
+        "`players.team`",
+        "`players.account_id`",
+        "`players.abandoned`",
+        "`players.hero_id`",
+        "start_time",
+        "winning_team",
+        "match_id",
+        "lobby_id",
+        "net_worth_team_0",
+        "net_worth_team_1",
+        "duration_s",
+        "spectators",
+        "open_spectator_slots",
+        "objectives_mask_team0",
+        "objectives_mask_team1",
+        "match_mode",
+        "game_mode",
+        "match_score",
+        "region_mode",
+        "scraped_at",
+    ]
+    query = f"""
+    SELECT DISTINCT ON(scraped_at) {", ".join(keys)}
+    FROM active_matches
+    WHERE match_id = %(match_id)s
+    ORDER BY scraped_at
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"match_id": match_id})
+    return [
+        ActiveMatch(
+            **{
+                k: col if not isinstance(col, datetime.datetime) else col.isoformat()
+                for k, col in zip(keys, row)
+                if not "players" in k
+            },
+            players=[
+                ActiveMatchPlayer(
+                    account_id=account_id,
+                    team=team,
+                    abandoned=abandoned,
+                    hero_id=hero_id,
+                )
+                for team, account_id, abandoned, hero_id in zip(
+                    row[0], row[1], row[2], row[3]
+                )
+            ],
+        )
+        for row in result
+    ]
 
 
 @router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
