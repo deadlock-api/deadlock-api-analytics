@@ -59,7 +59,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 )
                 status.raise_for_limit()
         except HTTPException as e:
-            print(f"Rate limit exceeded: {e.headers}")
+            ip = request.headers.get("CF-Connecting-IP", request.client.host)
+            print(f"Rate limit exceeded {e.headers} by IP {ip}")
             if ENFORCE_RATE_LIMITS:
                 return JSONResponse(
                     content=e.detail, status_code=e.status_code, headers=e.headers
