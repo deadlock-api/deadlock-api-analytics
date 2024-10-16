@@ -3,11 +3,7 @@ from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models import (
-    ACTIVE_MATCHES_KEYS,
-    ActiveMatch,
-    ActiveMatchPlayer,
-)
+from deadlock_analytics_api.models import ACTIVE_MATCHES_KEYS, ActiveMatch
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
@@ -576,6 +572,32 @@ class MatchSalts(BaseModel):
     cluster_id: int
     metadata_salt: int
     replay_salt: int
+
+
+@router.get("/matches/{match_id}/match-salts", tags=["Internal API-Key required"])
+def get_match_salts(
+    response: Response,
+    match_id: int,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> MatchSalts:
+    response.headers["Cache-Control"] = "private, max-age=1200"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT match_id, cluster_id, metadata_salt, replay_salt
+    FROM match_salts
+    WHERE match_id = %(match_id)s
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"match_id": match_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Match not found")
+    result = result[0]
+    return MatchSalts(
+        match_id=result[0],
+        cluster_id=result[1],
+        metadata_salt=result[2],
+        replay_salt=result[3],
+    )
 
 
 @router.post("/match-salts", tags=["Internal API-Key required"])
