@@ -3,9 +3,8 @@ import os
 import time
 from uuid import UUID
 
-import psycopg2
-import redis
 from cachetools.func import ttl_cache
+from deadlock_analytics_api.globs import POSTGRES, REDIS
 from deadlock_analytics_api.rate_limiter.models import (
     InvalidAPIKey,
     RateLimit,
@@ -16,20 +15,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 MAX_TTL_SECONDS = 60 * 60  # 1 hour
-
-REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
-REDIS_PASS = os.environ.get("REDIS_PASS")
-POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "postgres")
-POSTGRES_PASS = os.environ.get("POSTGRES_PASS")
-
 ENFORCE_RATE_LIMITS: bool = bool(os.environ.get("ENFORCE_RATE_LIMITS", False))
-
-REDIS = redis.Redis(
-    host=REDIS_HOST, port=6379, password=REDIS_PASS, db=0, decode_responses=True
-)
-POSTGRES = psycopg2.connect(
-    host=POSTGRES_HOST, port=5432, user="postgres", password=POSTGRES_PASS
-)
 
 WHITELISTED_ROUTES = [
     "/",
