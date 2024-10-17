@@ -556,7 +556,7 @@ def get_match_score(
     response.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT start_time, match_id, match_score
-    FROM active_matches
+    FROM finished_matches
     WHERE match_id = %(match_id)s
     LIMIT 1
     """
