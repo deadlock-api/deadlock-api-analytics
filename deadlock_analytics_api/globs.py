@@ -18,11 +18,16 @@ POSTGRES_HOST = os.environ.get("POSTGRES_HOST", "postgres")
 POSTGRES_PASS = os.environ.get("POSTGRES_PASS")
 
 
-REDIS = redis.Redis(
-    host=REDIS_HOST, port=6379, password=REDIS_PASS, db=0, decode_responses=True
-)
-POSTGRES = psycopg2.connect(
-    host=POSTGRES_HOST, port=5432, user="postgres", password=POSTGRES_PASS
-)
+def redis_conn():
+    return redis.Redis(
+        host=REDIS_HOST, port=6379, password=REDIS_PASS, db=0, decode_responses=True
+    )
+
+
+def postgres_conn():
+    return psycopg2.connect(
+        host=POSTGRES_HOST, port=5432, user="postgres", password=POSTGRES_PASS
+    )
+
 
 ENFORCE_RATE_LIMITS: bool = bool(os.environ.get("ENFORCE_RATE_LIMITS", False))
