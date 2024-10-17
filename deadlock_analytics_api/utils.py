@@ -10,7 +10,7 @@ api_key_query = APIKeyQuery(name="api_key", auto_error=True)
 @ttl_cache(maxsize=1024, ttl=60)
 def is_valid_api_key(api_key: str) -> bool:
     api_key = api_key.lstrip("HEXE-")
-    with postgres_conn.cursor() as cursor:
+    with postgres_conn().cursor() as cursor:
         cursor.execute(
             "SELECT 1 FROM api_keys WHERE key = %s",
             (str(api_key),),

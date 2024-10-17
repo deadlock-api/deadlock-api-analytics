@@ -163,7 +163,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     @ttl_cache(ttl=60)
     def get_limits_by_api_key(key: UUID) -> list[RateLimit]:
         limits = []
-        with postgres_conn.cursor() as cursor:
+        with postgres_conn().cursor() as cursor:
             cursor.execute(
                 "SELECT rate_global_limit, rate_global_period FROM api_keys WHERE key = %s",
                 (str(key),),
@@ -186,7 +186,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     @staticmethod
     async def limit_by_key(key: str, rate_limit: RateLimit) -> RateLimitStatus:
         current_time = float(time.time())
-        pipe = redis_conn.pipeline()
+        pipe = redis_conn().pipeline()
         pipe.zremrangebyscore(key, 0, current_time - MAX_TTL_SECONDS)
         pipe.zadd(key, {str(current_time): current_time})
         pipe.zrange(key, current_time - rate_limit.period, current_time, byscore=True)
