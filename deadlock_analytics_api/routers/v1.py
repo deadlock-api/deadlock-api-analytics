@@ -551,6 +551,7 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
 @router.get(
     "/matches",
     summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key with data access",
+    tags=["Data API-Key required"],
 )
 def get_all_finished_matches(
     response: Response,
