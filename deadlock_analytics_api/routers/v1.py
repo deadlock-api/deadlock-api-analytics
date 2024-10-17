@@ -390,10 +390,10 @@ def get_hero_leaderboard(
 
 
 @router.get("/matches/by-account-id/{account_id}")
-def get_matches_by_account_id(response: Response, account_id: int) -> list[int]:
+def get_matches_by_account_id(response: Response, account_id: int) -> list[dict]:
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT match_id
+    SELECT match_id, start_time
     FROM finished_matches
     ARRAY JOIN players
     WHERE players.account_id = %(account_id)s
@@ -402,7 +402,7 @@ def get_matches_by_account_id(response: Response, account_id: int) -> list[int]:
         result = client.execute(query, {"account_id": account_id})
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Not found")
-    return [r[0] for r in result]
+    return [{"match_id": r[0], "start_time": r[1].isoformat()} for r in result]
 
 
 @router.get(
