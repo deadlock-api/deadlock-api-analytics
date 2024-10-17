@@ -572,6 +572,7 @@ def get_all_finished_matches(
     print(f"Authenticated with API key: {api_key}")
     if min_unix_timestamp is None:
         min_unix_timestamp = 1728626400
+    min_unix_timestamp = max(min_unix_timestamp, 1728626400)
     if max_unix_timestamp is None:
         max_unix_timestamp = 4070908800
     if min_match_id is None:
