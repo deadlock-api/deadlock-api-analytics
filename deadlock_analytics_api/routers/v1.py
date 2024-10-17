@@ -3,12 +3,16 @@ from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models import ACTIVE_MATCHES_KEYS, ActiveMatch
+from deadlock_analytics_api.models import (
+    ACTIVE_MATCHES_KEYS,
+    ACTIVE_MATCHES_REDUCED_KEYS,
+    ActiveMatch,
+)
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 
 router = APIRouter(prefix="/v1")
 
@@ -540,6 +544,32 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"match_id": match_id})
     return [ActiveMatch.from_row(row) for row in result]
+
+
+@router.get(
+    "/matches",
+    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to get higher limits",
+)
+def get_all_finished_matches(
+    response: Response,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> StreamingResponse:
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    print(f"Authenticated with API key: {api_key}")
+    query = f"""
+    SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
+    FROM finished_matches
+    ORDER BY match_id
+    """
+    with CH_POOL.get_client() as client:
+
+        async def stream():
+            for i in client.execute_iter(query):
+                yield ActiveMatch.from_row(i).model_dump_json(
+                    include=ACTIVE_MATCHES_REDUCED_KEYS, exclude_none=True
+                ) + "\n"
+
+    return StreamingResponse(stream())
 
 
 class MatchScore(BaseModel):

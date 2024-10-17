@@ -25,6 +25,21 @@ ACTIVE_MATCHES_KEYS = [
     "scraped_at",
 ]
 
+ACTIVE_MATCHES_REDUCED_KEYS = [
+    "players",
+    "start_time",
+    "winning_team",
+    "match_id",
+    "net_worth_team_0",
+    "net_worth_team_1",
+    "objectives_mask_team0",
+    "objectives_mask_team1",
+    "match_mode",
+    "game_mode",
+    "match_score",
+    "region_mode",
+]
+
 
 class ActiveMatchPlayer(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
