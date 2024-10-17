@@ -128,6 +128,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             else []
                         )
                     ]
+                    + [
+                        i
+                        for i in (
+                            [
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:/v1/matches",
+                                    RateLimit(limit=10, period=60),
+                                ),
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:/v1/matches",
+                                    RateLimit(limit=100, period=60 * 60),
+                                ),
+                            ]
+                            if request.url.path.endswith("metadata")
+                            else []
+                        )
+                    ]
                 )
             except InvalidAPIKey:
                 print(f"Invalid API key: {api_key}, falling back to IP rate limits")

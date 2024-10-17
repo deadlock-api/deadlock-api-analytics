@@ -549,6 +549,42 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
 
 
 @router.get(
+    "/matches/{match_id}/metadata",
+    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to use this endpoint",
+    tags=["API-Key required"],
+)
+def get_match_metadata(
+    response: Response,
+    match_id: int,
+    api_key: APIKey = Depends(utils.get_api_key),
+) -> JSONResponse:
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    print(f"Authenticated with API key: {api_key}")
+    query = """
+    SELECT mi.match_id, mp.account_id, mi.*, mp.*
+    FROM match_info mi
+    LEFT JOIN match_player mp USING (match_id)
+    WHERE match_id = %(match_id)s
+    """
+    with CH_POOL.get_client() as client:
+        results, keys = client.execute(
+            query, {"match_id": match_id}, with_column_types=True
+        )
+    if len(results) == 0:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    return JSONResponse(
+        content=[
+            {
+                k: v if not isinstance(v, datetime.datetime) else v.isoformat()
+                for (k, _), v in zip(keys, result)
+            }
+            for result in results
+        ]
+    )
+
+
+@router.get(
     "/matches",
     summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key with data access",
     tags=["Data API-Key required"],
