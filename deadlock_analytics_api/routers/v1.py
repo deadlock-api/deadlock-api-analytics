@@ -548,20 +548,6 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     return [ActiveMatch.from_row(row) for row in result]
 
 
-QUERIES = {
-    "api_key": API_KEY,
-    "limit": 10000,  # 0 for all matches
-    "min_unix_timestamp": None,
-    "max_unix_timestamp": None,
-    "min_match_id": None,
-    "max_match_id": None,
-    "min_match_score": None,
-    "max_match_score": None,
-    "match_mode": None,  # "Ranked" or "Unranked"
-    "region": None,  # "Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"
-}
-
-
 @router.get(
     "/matches",
     summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to get higher limits",
