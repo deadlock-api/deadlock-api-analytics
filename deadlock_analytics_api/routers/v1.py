@@ -550,11 +550,11 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
 
 @router.get(
     "/matches",
-    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key with data access",
 )
 def get_all_finished_matches(
     response: Response,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
+    api_key: APIKey = Depends(utils.get_data_api_key),
     limit: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=1728626400)] = None,
     max_unix_timestamp: int | None = None,

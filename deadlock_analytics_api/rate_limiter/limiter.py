@@ -111,6 +111,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             else []
                         )
                     ]
+                    + [  # path param matching isn't implemented yet
+                        i
+                        for i in (
+                            [
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:/v1/matches",
+                                    RateLimit(limit=1, period=60),
+                                ),
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:/v1/matches",
+                                    RateLimit(limit=10, period=60 * 60),
+                                ),
+                            ]
+                            if request.url.path == "/v1/matches"
+                            else []
+                        )
+                    ]
                 )
             except InvalidAPIKey:
                 print(f"Invalid API key: {api_key}, falling back to IP rate limits")
