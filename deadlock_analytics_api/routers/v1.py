@@ -390,10 +390,10 @@ def get_hero_leaderboard(
 
 
 @router.get("/matches/by-account-id/{account_id}")
-def get_matches_by_account_id(response: Response, account_id: int) -> JSONResponse:
+def get_matches_by_account_id(response: Response, account_id: int) -> list[int]:
     response.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT *
+    SELECT match_id
     FROM finished_matches
     ARRAY JOIN players
     WHERE players.account_id = %(account_id)s
@@ -402,70 +402,7 @@ def get_matches_by_account_id(response: Response, account_id: int) -> JSONRespon
         result = client.execute(query, {"account_id": account_id})
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Not found")
-    keys = [
-        "start_time",
-        "winning_team",
-        "match_id",
-        "players.account_id",
-        "players.team",
-        "players.abandoned",
-        "players.hero_id",
-        "lobby_id",
-        "net_worth_team_0",
-        "net_worth_team_1",
-        "duration_s",
-        "spectators",
-        "open_spectator_slots",
-        "objectives_mask_team0",
-        "objectives_mask_team1",
-        "match_mode",
-        "game_mode",
-        "match_score",
-        "region_mode",
-        "scraped_at",
-        "team0_core",
-        "team0_tier1_lane1",
-        "team0_tier2_lane1",
-        "team0_tier1_lane2",
-        "team0_tier2_lane2",
-        "team0_tier1_lane3",
-        "team0_tier2_lane3",
-        "team0_tier1_lane4",
-        "team0_tier2_lane4",
-        "team0_titan",
-        "team0_titan_shield_generator_1",
-        "team0_titan_shield_generator_2",
-        "team0_barrack_boss_lane1",
-        "team0_barrack_boss_lane2",
-        "team0_barrack_boss_lane3",
-        "team0_barrack_boss_lane4",
-        "team1_core",
-        "team1_tier1_lane1",
-        "team1_tier2_lane1",
-        "team1_tier1_lane2",
-        "team1_tier2_lane2",
-        "team1_tier1_lane3",
-        "team1_tier2_lane3",
-        "team1_tier1_lane4",
-        "team1_tier2_lane4",
-        "team1_titan",
-        "team1_titan_shield_generator_1",
-        "team1_titan_shield_generator_2",
-        "team1_barrack_boss_lane1",
-        "team1_barrack_boss_lane2",
-        "team1_barrack_boss_lane3",
-        "team1_barrack_boss_lane4",
-        "winner",
-    ]
-
-    result = [
-        {
-            k: col if not isinstance(col, datetime.datetime) else col.isoformat()
-            for k, col in zip(keys, row)
-        }
-        for row in result
-    ]
-    return JSONResponse(content=result)
+    return [r[0] for r in result]
 
 
 @router.get(
@@ -529,6 +466,26 @@ def match_search(
             },
         )
     return [ActiveMatch.from_row(row) for row in result]
+
+
+@router.get(
+    "/matches/{match_id}/short",
+    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key to get higher limits",
+)
+def match_short(response: Response, match_id: int) -> ActiveMatch:
+    response.headers["Cache-Control"] = "public, max-age=1200"
+    query = f"""
+    SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
+    FROM finished_matches
+    WHERE match_id = %(match_id)s
+    LIMIT 1
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"match_id": match_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Match not found")
+    row = result[0]
+    return ActiveMatch.from_row(row)
 
 
 @router.get(

@@ -145,6 +145,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                             else []
                         )
                     ]
+                    + [  # path param matching isn't implemented yet
+                        i
+                        for i in (
+                            [
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:short",
+                                    RateLimit(limit=10, period=60),
+                                ),
+                                await RateLimitMiddleware.limit_by_key(
+                                    f"{api_key}:short",
+                                    RateLimit(limit=100, period=60 * 60),
+                                ),
+                            ]
+                            if request.url.path.endswith("short")
+                            else []
+                        )
+                    ]
                 )
             except InvalidAPIKey:
                 print(f"Invalid API key: {api_key}, falling back to IP rate limits")
@@ -190,6 +207,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         ),
                     ]
                     if request.url.path.startswith("/matches/by-account-id")
+                    else []
+                )
+            ]
+            + [  # path param matching isn't implemented yet
+                i
+                for i in (
+                    [
+                        await RateLimitMiddleware.limit_by_key(
+                            f"{ip}:short",
+                            RateLimit(limit=10, period=60),
+                        ),
+                        await RateLimitMiddleware.limit_by_key(
+                            f"{ip}:short",
+                            RateLimit(limit=100, period=60 * 60),
+                        ),
+                    ]
+                    if request.url.path.endswith("short")
                     else []
                 )
             ]
