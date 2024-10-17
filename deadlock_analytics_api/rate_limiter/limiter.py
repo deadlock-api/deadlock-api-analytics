@@ -99,11 +99,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         for i in (
                             [
                                 await RateLimitMiddleware.limit_by_key(
-                                    f"{api_key}:timestamps",
+                                    f"{api_key}:/matches/by-account-id",
                                     RateLimit(limit=10, period=60),
                                 ),
                                 await RateLimitMiddleware.limit_by_key(
-                                    f"{api_key}:timestamps",
+                                    f"{api_key}:/matches/by-account-id",
                                     RateLimit(limit=100, period=60 * 60),
                                 ),
                             ]
@@ -133,11 +133,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                         for i in (
                             [
                                 await RateLimitMiddleware.limit_by_key(
-                                    f"{api_key}:/v1/matches",
+                                    f"{api_key}:metadata",
                                     RateLimit(limit=10, period=60),
                                 ),
                                 await RateLimitMiddleware.limit_by_key(
-                                    f"{api_key}:/v1/matches",
+                                    f"{api_key}:metadata",
                                     RateLimit(limit=100, period=60 * 60),
                                 ),
                             ]
@@ -181,15 +181,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 for i in (
                     [
                         await RateLimitMiddleware.limit_by_key(
-                            f"{ip}:timestamps",
+                            f"{ip}:/matches/by-account-id",
                             RateLimit(limit=10, period=60),
                         ),
                         await RateLimitMiddleware.limit_by_key(
-                            f"{ip}:timestamps",
+                            f"{ip}:/matches/by-account-id",
                             RateLimit(limit=100, period=60 * 60),
                         ),
                     ]
-                    if "by-account-id" in request.url.path
+                    if request.url.path.startswith("/matches/by-account-id")
                     else []
                 )
             ]
