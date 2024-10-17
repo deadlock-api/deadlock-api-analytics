@@ -475,11 +475,11 @@ def get_matches_by_account_id(response: Response, account_id: int) -> JSONRespon
 def match_search(
     response: Response,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
+    max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
-    max_match_id: Annotated[int | None, Query(le=999999999)] = None,
+    max_match_id: int | None = None,
     min_match_score: Annotated[int | None, Query(ge=0)] = None,
-    max_match_score: Annotated[int | None, Query(le=3000)] = None,
+    max_match_score: int | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     region: (
@@ -499,7 +499,7 @@ def match_search(
     if min_match_score is None:
         min_match_score = 0
     if max_match_score is None:
-        max_match_score = 3000
+        max_match_score = 5000
     query = f"""
     SELECT DISTINCT ON(match_id) {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM finished_matches
@@ -548,6 +548,20 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     return [ActiveMatch.from_row(row) for row in result]
 
 
+QUERIES = {
+    "api_key": API_KEY,
+    "limit": 10000,  # 0 for all matches
+    "min_unix_timestamp": None,
+    "max_unix_timestamp": None,
+    "min_match_id": None,
+    "max_match_id": None,
+    "min_match_score": None,
+    "max_match_score": None,
+    "match_mode": None,  # "Ranked" or "Unranked"
+    "region": None,  # "Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"
+}
+
+
 @router.get(
     "/matches",
     summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to get higher limits",
@@ -556,13 +570,42 @@ def get_all_finished_matches(
     response: Response,
     api_key: APIKey = Depends(utils.get_internal_api_key),
     limit: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=1728626400)] = None,
+    max_unix_timestamp: int | None = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_match_score: Annotated[int | None, Query(ge=0)] = None,
+    max_match_score: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
+    hero_id: int | None = None,
 ) -> StreamingResponse:
     response.headers["Cache-Control"] = "private, max-age=3600"
     print(f"Authenticated with API key: {api_key}")
+    if min_unix_timestamp is None:
+        min_unix_timestamp = 1728626400
+    if max_unix_timestamp is None:
+        max_unix_timestamp = 4070908800
+    if min_match_id is None:
+        min_match_id = 0
+    if max_match_id is None:
+        max_match_id = 999999999
+    if min_match_score is None:
+        min_match_score = 0
+    if max_match_score is None:
+        max_match_score = 5000
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
     FROM finished_matches
-    WHERE start_time < now() - INTERVAL '1 day'
+    WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
+    AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
+    AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
+    AND (%(region)s IS NULL OR region_mode = %(region)s)
+    AND (%(hero_id)s IS NULL OR has(`players.hero_id`, %(hero_id)s))
+    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
+    AND start_time < now() - INTERVAL '1 day'
     LIMIT %(limit)s
     """
     client = Client(
@@ -577,7 +620,18 @@ def get_all_finished_matches(
         is_first = True
         for row in client.execute_iter(
             query,
-            {"limit": limit if limit is not None and limit > 0 else 100_000_000},
+            {
+                "limit": limit if limit is not None and limit > 0 else 100_000_000,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_match_score": min_match_score,
+                "max_match_score": max_match_score,
+                "region": region,
+                "hero_id": hero_id,
+                "match_mode": match_mode,
+            },
             settings={
                 "max_block_size": 1000000,
             },
