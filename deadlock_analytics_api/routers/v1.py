@@ -3,12 +3,16 @@ from typing import Annotated, Literal
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models import ACTIVE_MATCHES_KEYS, ActiveMatch
+from deadlock_analytics_api.models import (
+    ACTIVE_MATCHES_KEYS,
+    ACTIVE_MATCHES_REDUCED_KEYS,
+    ActiveMatch,
+)
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 
 router = APIRouter(prefix="/v1")
 
@@ -540,6 +544,54 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"match_id": match_id})
     return [ActiveMatch.from_row(row) for row in result]
+
+
+@router.get(
+    "/matches",
+    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to get higher limits",
+)
+def get_all_finished_matches(
+    response: Response,
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+    limit: int | None = None,
+) -> StreamingResponse:
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    print(f"Authenticated with API key: {api_key}")
+    query = f"""
+    SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
+    FROM finished_matches
+    WHERE start_time < now() - INTERVAL '1 day'
+    LIMIT %(limit)s
+    """
+    with CH_POOL.get_client() as client:
+
+        async def stream():
+            is_first = True
+            for row in client.execute_iter(
+                query,
+                {"limit": limit if limit is not None and limit > 0 else 100_000_000},
+                settings={
+                    "max_block_size": 1000000,
+                },
+                with_column_types=True,
+            ):
+                if is_first:
+                    is_first = False
+                    yield (",".join(c for (c, _) in row) + "\n").encode()
+                    continue
+                yield (
+                    ",".join(
+                        (
+                            str(c)
+                            if not isinstance(c, datetime.datetime)
+                            else c.isoformat()
+                        )
+                        for c in row
+                    )
+                    + "\n"
+                ).encode()
+
+    return StreamingResponse(stream())
 
 
 class MatchScore(BaseModel):
