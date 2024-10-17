@@ -695,30 +695,29 @@ class MatchSalts(BaseModel):
     replay_salt: int
 
 
-@router.get("/matches/{match_id}/salts", tags=["Internal API-Key required"])
+@router.get("/match-salts", tags=["Internal API-Key required"])
 def get_match_salts(
-    response: Response,
-    match_id: int,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
-) -> MatchSalts:
+    response: Response, api_key: APIKey = Depends(utils.get_internal_api_key)
+) -> list[MatchSalts]:
     response.headers["Cache-Control"] = "private, max-age=1200"
     print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT match_id, cluster_id, metadata_salt, replay_salt
     FROM match_salts
-    WHERE match_id = %(match_id)s
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"match_id": match_id})
-    if len(result) == 0:
+        results = client.execute(query)
+    if len(results) == 0:
         raise HTTPException(status_code=404, detail="Match not found")
-    result = result[0]
-    return MatchSalts(
-        match_id=result[0],
-        cluster_id=result[1],
-        metadata_salt=result[2],
-        replay_salt=result[3],
-    )
+    return [
+        MatchSalts(
+            match_id=row[0],
+            cluster_id=row[1],
+            metadata_salt=row[2],
+            replay_salt=row[3],
+        )
+        for row in results
+    ]
 
 
 @router.post("/match-salts", tags=["Internal API-Key required"])
