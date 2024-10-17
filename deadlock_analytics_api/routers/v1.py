@@ -559,12 +559,16 @@ def get_all_finished_matches(
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM finished_matches
-    ORDER BY match_id
     """
     with CH_POOL.get_client() as client:
 
         async def stream():
-            for i in client.execute_iter(query):
+            for i in client.execute_iter(
+                query,
+                settings={
+                    "max_block_size": 1000000,
+                },
+            ):
                 yield ActiveMatch.from_row(i).model_dump_json(
                     include=ACTIVE_MATCHES_REDUCED_KEYS, exclude_none=True
                 ) + "\n"
