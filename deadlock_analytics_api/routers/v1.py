@@ -1,6 +1,8 @@
 import datetime
+import os
 from typing import Annotated, Literal
 
+from clickhouse_driver import Client
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.models import (
@@ -563,33 +565,35 @@ def get_all_finished_matches(
     WHERE start_time < now() - INTERVAL '1 day'
     LIMIT %(limit)s
     """
-    with CH_POOL.get_client() as client:
+    client = Client(
+        host=os.getenv("CLICKHOUSE_HOST", "localhost"),
+        port=int(os.getenv("CLICKHOUSE_PORT", 9000)),
+        user=os.getenv("CLICKHOUSE_USER", "default"),
+        password=os.getenv("CLICKHOUSE_PASSWORD", ""),
+        database=os.getenv("CLICKHOUSE_DB", "default"),
+    )
 
-        async def stream():
-            is_first = True
-            for row in client.execute_iter(
-                query,
-                {"limit": limit if limit is not None and limit > 0 else 100_000_000},
-                settings={
-                    "max_block_size": 1000000,
-                },
-                with_column_types=True,
-            ):
-                if is_first:
-                    is_first = False
-                    yield (",".join(c for (c, _) in row) + "\n").encode()
-                    continue
-                yield (
-                    ",".join(
-                        (
-                            str(c)
-                            if not isinstance(c, datetime.datetime)
-                            else c.isoformat()
-                        )
-                        for c in row
-                    )
-                    + "\n"
-                ).encode()
+    async def stream():
+        is_first = True
+        for row in client.execute_iter(
+            query,
+            {"limit": limit if limit is not None and limit > 0 else 100_000_000},
+            settings={
+                "max_block_size": 1000000,
+            },
+            with_column_types=True,
+        ):
+            if is_first:
+                is_first = False
+                yield (",".join(c for (c, _) in row) + "\n").encode()
+                continue
+            yield (
+                ",".join(
+                    (str(c) if not isinstance(c, datetime.datetime) else c.isoformat())
+                    for c in row
+                )
+                + "\n"
+            ).encode()
 
     return StreamingResponse(stream())
 
