@@ -383,12 +383,6 @@ def get_hero_leaderboard(
     ]
 
 
-class MatchScore(BaseModel):
-    start_time: datetime.datetime
-    match_id: int
-    match_score: int
-
-
 @router.get("/matches/by-account-id/{account_id}")
 def get_matches_by_account_id(response: Response, account_id: int) -> JSONResponse:
     response.headers["Cache-Control"] = "public, max-age=300"
@@ -548,14 +542,18 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
     return [ActiveMatch.from_row(row) for row in result]
 
 
-@router.get("/matches/{match_id}/score", tags=["Internal API-Key required"])
-def get_match_scores(
+class MatchScore(BaseModel):
+    start_time: datetime.datetime
+    match_id: int
+    match_score: int
+
+
+@router.get("/matches/{match_id}/score")
+def get_match_score(
     response: Response,
     match_id: int,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> MatchScore:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
+    response.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT start_time, match_id, match_score
     FROM active_matches
