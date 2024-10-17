@@ -167,7 +167,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 print(f"Invalid API key: {api_key}, falling back to IP rate limits")
             except ValueError as e:
                 print(e)
-                print(f"Invalid API key: {api_key}")
+                print(f"Invalid API key: {api_key}, falling back to IP rate limits")
         ip = request.headers.get("CF-Connecting-IP", request.client.host)
         return (
             [
