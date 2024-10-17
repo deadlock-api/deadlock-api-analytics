@@ -148,10 +148,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 for i in (
                     [
                         await RateLimitMiddleware.limit_by_key(
-                            f"{api_key}:timestamps", RateLimit(limit=10, period=60)
+                            f"{ip}:timestamps", RateLimit(limit=10, period=60)
                         ),
                         await RateLimitMiddleware.limit_by_key(
-                            f"{api_key}:timestamps",
+                            f"{ip}:timestamps",
                             RateLimit(limit=100, period=60 * 60),
                         ),
                     ]
@@ -164,11 +164,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 for i in (
                     [
                         await RateLimitMiddleware.limit_by_key(
-                            f"{api_key}:timestamps",
+                            f"{ip}:timestamps",
                             RateLimit(limit=10, period=60),
                         ),
                         await RateLimitMiddleware.limit_by_key(
-                            f"{api_key}:timestamps",
+                            f"{ip}:timestamps",
                             RateLimit(limit=100, period=60 * 60),
                         ),
                     ]
