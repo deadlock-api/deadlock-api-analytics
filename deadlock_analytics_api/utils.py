@@ -25,7 +25,11 @@ async def get_api_key(api_key: str = Security(api_key_query)):
 
 
 async def get_data_api_key(api_key: str = Security(api_key_query)):
-    if not is_valid_api_key(api_key, True):
+    try:
+        if not is_valid_api_key(api_key, True):
+            raise HTTPException(status_code=HTTP_403_FORBIDDEN)
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=HTTP_403_FORBIDDEN)
     return api_key
 
