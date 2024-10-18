@@ -30,6 +30,8 @@ RATE_LIMITS = {
         RateLimit(limit=20, period=10),
         RateLimit(limit=1, period=60, path="/v1/matches"),
         RateLimit(limit=10, period=60 * 60, path="/v1/matches"),
+        RateLimit(limit=20, period=60, path="/v1/matches/search"),
+        RateLimit(limit=300, period=60 * 60, path="/v1/matches/search"),
     ],
 }
 

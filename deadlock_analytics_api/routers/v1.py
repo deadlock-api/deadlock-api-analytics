@@ -407,7 +407,7 @@ def get_matches_by_account_id(response: Response, account_id: int) -> list[dict]
 
 @router.get(
     "/matches/search",
-    summary="RateLimit: 10req/min 50req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 20req/min 300req/hour, Apply for an API-Key to get higher limits",
 )
 def match_search(
     response: Response,
@@ -417,7 +417,7 @@ def match_search(
     max_match_id: int | None = None,
     min_match_score: Annotated[int | None, Query(ge=0)] = None,
     max_match_score: int | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     region: (
         Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
