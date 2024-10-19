@@ -41,6 +41,7 @@ ACTIVE_MATCHES_REDUCED_KEYS = [
     "game_mode",
     "match_score",
     "region_mode",
+    "winner",
 ]
 
 
