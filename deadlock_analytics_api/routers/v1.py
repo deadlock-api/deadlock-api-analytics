@@ -304,8 +304,8 @@ def get_leaderboard(
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank, leaderboard.matches_played as matches_played
-    FROM (SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
+    SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank, matches_played
+    FROM (SELECT account_id, anyLast(player_score) AS player_score, COUNT() AS matches_played FROM mmr_history GROUP BY account_id)
     ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
