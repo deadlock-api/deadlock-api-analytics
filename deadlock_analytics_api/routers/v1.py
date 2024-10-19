@@ -299,7 +299,7 @@ def get_leaderboard(
     req: Request,
     res: Response,
     start: Annotated[int, Query(ge=1)] = 1,
-    limit: Annotated[int, Query(le=10000)] = 1000,
+    limit: Annotated[int, Query(le=1000)] = 100,
 ) -> list[PlayerLeaderboard]:
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
