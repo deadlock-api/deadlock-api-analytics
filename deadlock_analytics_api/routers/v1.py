@@ -670,15 +670,15 @@ def get_recent_matches(
     SELECT DISTINCT match_id
     FROM finished_matches
     WHERE start_time < now() - INTERVAL '1 hour'
-        AND start_time > now() - INTERVAL '2 hours'
+        AND start_time > now() - INTERVAL '7 days'
+        AND start_time > '2024-10-11 06:00:00'
         AND match_id NOT IN (SELECT match_id FROM match_salts)
     ORDER BY start_time
+    LIMIT 10000
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
-    keys = ["match_id"]
-    result = [{k: col for k, col in zip(keys, row)} for row in result]
-    return JSONResponse(content=result)
+    return JSONResponse(content=[{"match_id": r[0]} for r in result])
 
 
 class MatchSalts(BaseModel):
