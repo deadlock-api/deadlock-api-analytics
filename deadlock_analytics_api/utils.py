@@ -1,8 +1,13 @@
+import logging
+import uuid
+
 from cachetools.func import ttl_cache
 from deadlock_analytics_api.globs import postgres_conn
 from fastapi import HTTPException, Security
 from fastapi.security.api_key import APIKeyQuery
 from starlette.status import HTTP_403_FORBIDDEN
+
+LOGGER = logging.getLogger(__name__)
 
 api_key_query = APIKeyQuery(name="api_key", auto_error=True)
 
@@ -41,3 +46,17 @@ async def get_internal_api_key(api_key: str = Security(api_key_query)):
     if api_key in available_api_keys:
         return api_key
     raise HTTPException(status_code=HTTP_403_FORBIDDEN)
+
+
+def is_valid_uuid(value: str) -> bool:
+    if value is None:
+        return False
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        LOGGER.warning(f"Invalid UUID: {value}")
+        return False
+    except TypeError:
+        LOGGER.warning(f"Invalid UUID: {value}")
+        return False

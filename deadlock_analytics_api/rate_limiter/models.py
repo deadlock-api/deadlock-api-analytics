@@ -1,7 +1,10 @@
+import logging
 import time
 
 from fastapi import HTTPException
 from pydantic import BaseModel
+
+LOGGER = logging.getLogger(__name__)
 
 
 class RateLimitStatus(BaseModel):
@@ -51,7 +54,3 @@ class RateLimit(BaseModel):
     limit: int
     period: int
     path: str | None = None
-
-
-class InvalidAPIKey(Exception):
-    pass

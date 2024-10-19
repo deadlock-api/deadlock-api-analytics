@@ -10,10 +10,13 @@ from deadlock_analytics_api.models import (
     ACTIVE_MATCHES_REDUCED_KEYS,
     ActiveMatch,
 )
+from deadlock_analytics_api.rate_limiter import limiter
+from deadlock_analytics_api.rate_limiter.models import RateLimit
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
+from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
 router = APIRouter(prefix="/v1")
@@ -24,9 +27,14 @@ class MatchScoreDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-score-distribution")
-def get_match_score_distribution(response: Response) -> list[MatchScoreDistribution]:
-    response.headers["Cache-Control"] = "public, max-age=3600"
+@router.get("/match-score-distribution", summary="RateLimit: 10req/s")
+def get_match_score_distribution(
+    req: Request, res: Response
+) -> list[MatchScoreDistribution]:
+    limiter.apply_limits(
+        req, res, "/v1/match-score-distribution", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT match_score as score, COUNT(DISTINCT match_id) as match_score_count
     FROM finished_matches
@@ -44,11 +52,14 @@ class PlayerScoreDistribution(BaseModel):
     count: int
 
 
-@router.get("/player-score-distribution")
+@router.get("/player-score-distribution", summary="RateLimit: 10req/s")
 def get_player_score_distribution(
-    response: Response, mode: Literal["all", "Ranked", "Unranked"] = "all"
+    req: Request, res: Response, mode: Literal["all", "Ranked", "Unranked"] = "all"
 ) -> list[PlayerScoreDistribution]:
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    limiter.apply_limits(
+        req, res, "/v1/player-score-distribution", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT ROUND(player_score) as score, COUNT(DISTINCT account_id) as match_score_count
     FROM mmr_history
@@ -68,9 +79,14 @@ class RegionDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-region-distribution")
-def get_match_region_distribution(response: Response) -> list[RegionDistribution]:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+@router.get("/match-region-distribution", summary="RateLimit: 10req/s")
+def get_match_region_distribution(
+    req: Request, res: Response
+) -> list[RegionDistribution]:
+    limiter.apply_limits(
+        req, res, "/v1/match-region-distribution", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT region_mode, COUNT(DISTINCT match_id) as count
     FROM active_matches
@@ -88,14 +104,18 @@ class HeroWinLossStat(BaseModel):
     losses: int
 
 
-@router.get("/hero-win-loss-stats")
+@router.get("/hero-win-loss-stats", summary="RateLimit: 10req/s")
 def get_hero_win_loss_stats(
-    response: Response,
+    req: Request,
+    res: Response,
     min_match_score: Annotated[int | None, Query(ge=0)] = None,
     max_match_score: Annotated[int | None, Query(le=3000)] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
 ) -> list[HeroWinLossStat]:
+    limiter.apply_limits(
+        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=10, period=1)]
+    )
     if min_match_score is None:
         min_match_score = 0
     if max_match_score is None:
@@ -104,7 +124,7 @@ def get_hero_win_loss_stats(
         min_unix_timestamp = 0
     if max_unix_timestamp is None:
         max_unix_timestamp = 4070908800
-    response.headers["Cache-Control"] = "public, max-age=1200"
+    res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     SELECT `players.hero_id`                  as hero_id,
             countIf(`players.team` == winner) AS wins,
@@ -153,14 +173,23 @@ Ranks update in 1min intervals.
 
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
+    summary="RateLimit: 100req/s",
 )
 def get_player_rank(
-    response: Response,
+    req: Request,
+    res: Response,
     account_id: Annotated[
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> PlayerLeaderboard:
-    response.headers["Cache-Control"] = "public, max-age=300"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/players/{account_id}/rank",
+        [RateLimit(limit=100, period=1)],
+        [RateLimit(limit=1000, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT leaderboard.*
     FROM (SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id)) leaderboard
@@ -199,14 +228,23 @@ Ranks update in 1min intervals.
 
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
+    summary="RateLimit: 100req/s",
 )
 def get_player_mmr_history(
-    response: Response,
+    req: Request,
+    res: Response,
     account_id: Annotated[
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> list[PlayerMMRHistoryEntry]:
-    response.headers["Cache-Control"] = "public, max-age=300"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/players/{account_id}/mmr-history",
+        [RateLimit(limit=100, period=1)],
+        [RateLimit(limit=1000, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT account_id, match_id, ROUND(player_score)
     FROM mmr_history
@@ -255,13 +293,16 @@ Ranks update in 1min intervals.
 
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
+    summary="RateLimit: 10req/s",
 )
 def get_leaderboard(
-    response: Response,
+    req: Request,
+    res: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
 ) -> list[PlayerLeaderboard]:
-    response.headers["Cache-Control"] = "public, max-age=300"
+    limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT leaderboard.account_id, ROUND(leaderboard.player_score), row_number() OVER (ORDER BY leaderboard.player_score DESC) AS rank, leaderboard.matches_played as matches_played
     FROM (SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id) leaderboard
@@ -299,14 +340,19 @@ Ranks update in 1min intervals.
 
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
+    summary="RateLimit: 10req/s",
 )
 def get_leaderboard_by_region(
-    response: Response,
+    req: Request,
+    res: Response,
     region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
 ) -> list[PlayerLeaderboard]:
-    response.headers["Cache-Control"] = "public, max-age=300"
+    limiter.apply_limits(
+        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     WITH leaderboard AS (
         SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played
@@ -356,15 +402,20 @@ As soon as I see someone abusing this endpoint, I will make it a private (api-ke
 
 Ranks update in 10min intervals.
 """,
+    summary="RateLimit: 10req/s",
 )
 def get_hero_leaderboard(
-    response: Response,
+    req: Request,
+    res: Response,
     hero_id: int,
     min_total_games: Annotated[int, Query(ge=10)] = 10,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=100)] = 100,
 ) -> list[HeroLeaderboard]:
-    response.headers["Cache-Control"] = "public, max-age=300"
+    limiter.apply_limits(
+        req, res, "/v1/hero-leaderboard/{hero_id}", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT *
     FROM hero_player_winrate
@@ -389,9 +440,17 @@ def get_hero_leaderboard(
     ]
 
 
-@router.get("/matches/by-account-id/{account_id}")
-def get_matches_by_account_id(response: Response, account_id: int) -> list[dict]:
-    response.headers["Cache-Control"] = "public, max-age=300"
+@router.get("/matches/by-account-id/{account_id}", summary="RateLimit: 10req/s")
+def get_matches_by_account_id(
+    req: Request, res: Response, account_id: int
+) -> list[dict]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/by-account-id/{account_id}",
+        [RateLimit(limit=10, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT match_id, start_time
     FROM finished_matches
@@ -407,10 +466,11 @@ def get_matches_by_account_id(response: Response, account_id: int) -> list[dict]
 
 @router.get(
     "/matches/search",
-    summary="RateLimit: 20req/min 300req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
 )
 def match_search(
-    response: Response,
+    req: Request,
+    res: Response,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -424,7 +484,13 @@ def match_search(
     ) = None,
     hero_id: int | None = None,
 ) -> list[ActiveMatch]:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/search",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
     if min_unix_timestamp is None:
         min_unix_timestamp = 0
     if max_unix_timestamp is None:
@@ -470,10 +536,16 @@ def match_search(
 
 @router.get(
     "/matches/{match_id}/short",
-    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
 )
-def match_short(response: Response, match_id: int) -> ActiveMatch:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/{match_id}/short",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM finished_matches
@@ -490,10 +562,16 @@ def match_short(response: Response, match_id: int) -> ActiveMatch:
 
 @router.get(
     "/matches/{match_id}/timestamps",
-    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
 )
-def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
-    response.headers["Cache-Control"] = "public, max-age=1200"
+def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/{match_id}/timestamps",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
     SELECT DISTINCT ON(scraped_at) {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM active_matches
@@ -507,15 +585,22 @@ def match_timestamps(response: Response, match_id: int) -> list[ActiveMatch]:
 
 @router.get(
     "/matches/{match_id}/metadata",
-    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key to use this endpoint",
+    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to use this endpoint",
     tags=["API-Key required"],
 )
 def get_match_metadata(
-    response: Response,
+    req: Request,
+    res: Response,
     match_id: int,
     api_key: APIKey = Depends(utils.get_api_key),
 ) -> JSONResponse:
-    response.headers["Cache-Control"] = "private, max-age=3600"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/{match_id}/metadata",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+    )
+    res.headers["Cache-Control"] = "private, max-age=3600"
     print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT mi.match_id, mp.account_id, mi.*, mp.*
@@ -543,11 +628,12 @@ def get_match_metadata(
 
 @router.get(
     "/matches",
-    summary="RateLimit: 1req/min 10req/hour, Apply for an API-Key with data access",
+    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key with data access",
     tags=["Data API-Key required"],
 )
 def get_all_finished_matches(
-    response: Response,
+    req: Request,
+    res: Response,
     api_key: APIKey = Depends(utils.get_data_api_key),
     limit: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=1728626400)] = None,
@@ -562,7 +648,13 @@ def get_all_finished_matches(
     ) = None,
     hero_id: int | None = None,
 ) -> StreamingResponse:
-    response.headers["Cache-Control"] = "private, max-age=3600"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches",
+        [RateLimit(limit=10, period=60), RateLimit(limit=100, period=3600)],
+    )
+    res.headers["Cache-Control"] = "private, max-age=3600"
     print(f"Authenticated with API key: {api_key}")
     if min_unix_timestamp is None:
         min_unix_timestamp = 1728626400
@@ -639,12 +731,19 @@ class MatchScore(BaseModel):
     match_score: int
 
 
-@router.get("/matches/{match_id}/score")
+@router.get("/matches/{match_id}/score", summary="RateLimit: 100/s")
 def get_match_score(
-    response: Response,
+    req: Request,
+    res: Response,
     match_id: int,
 ) -> MatchScore:
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/{match_id}/score",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT start_time, match_id, match_score
     FROM finished_matches
