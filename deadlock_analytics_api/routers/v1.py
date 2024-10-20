@@ -312,15 +312,19 @@ def get_leaderboard(
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
         limit = 100_000_000
+        start = 1
     query = """
-    SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank, matches_played
-    FROM (SELECT account_id, anyLast(player_score) AS player_score, COUNT() AS matches_played FROM mmr_history GROUP BY account_id)
+    SELECT account_id, player_score, rank, matches_played
+    FROM leaderboard
+    WHERE %(account_id)s IS NULL OR account_id = %(account_id)s
     ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"start": start - 1, "limit": limit})
+        result = client.execute(
+            query, {"start": start - 1, "limit": limit, "account_id": account_id}
+        )
     return [
         PlayerLeaderboard(
             account_id=r[0],
@@ -329,7 +333,6 @@ def get_leaderboard(
             matches_played=r[3],
         )
         for r in result
-        if account_id is None or r[0] == account_id
     ]
 
 
@@ -364,19 +367,9 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    WITH leaderboard AS (
-        SELECT account_id, player_score, COUNT() OVER (PARTITION BY account_id) as matches_played
-        FROM mmr_history
-        WHERE account_id IN (
-            SELECT account_id
-            FROM player_region
-            WHERE region_mode = %(region)s
-        )
-        ORDER BY account_id, match_id DESC
-        LIMIT 1 BY account_id
-    )
-    SELECT leaderboard.account_id, ROUND(leaderboard.player_score) AS player_score, ROW_NUMBER() OVER (ORDER BY leaderboard.player_score DESC) AS rank, leaderboard.matches_played as matches_played
+    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played
     FROM leaderboard
+    WHERE region_mode = %(region)s
     ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
