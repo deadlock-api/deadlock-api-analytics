@@ -105,7 +105,7 @@ class HeroWinLossStat(BaseModel):
     losses: int
 
 
-@router.get("/hero-win-loss-stats", summary="RateLimit: 10req/s")
+@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s")
 def get_hero_win_loss_stats(
     req: Request,
     res: Response,
@@ -115,7 +115,7 @@ def get_hero_win_loss_stats(
     max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
 ) -> list[HeroWinLossStat]:
     limiter.apply_limits(
-        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
     )
     if min_match_score is None:
         min_match_score = 0
@@ -554,6 +554,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
         res,
         "/v1/matches/{match_id}/short",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+        [RateLimit(limit=100, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -580,6 +581,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
         res,
         "/v1/matches/{match_id}/timestamps",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+        [RateLimit(limit=100, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -602,16 +604,15 @@ def get_match_metadata(
     req: Request,
     res: Response,
     match_id: int,
-    api_key: APIKey = Depends(utils.get_api_key),
 ) -> MatchMetadata:
     limiter.apply_limits(
         req,
         res,
         "/v1/matches/{match_id}/metadata",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+        [RateLimit(limit=10, period=60), RateLimit(limit=100, period=3600)],
+        [RateLimit(limit=100, period=60)],
     )
-    res.headers["Cache-Control"] = "private, max-age=3600"
-    print(f"Authenticated with API key: {api_key}")
+    res.headers["Cache-Control"] = "public, max-age=3600"
     query = "SELECT * FROM match_info WHERE match_id = %(match_id)s LIMIT 1"
     with CH_POOL.get_client() as client:
         match_info, keys = client.execute(
