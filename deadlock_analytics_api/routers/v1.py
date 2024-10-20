@@ -309,6 +309,8 @@ def get_leaderboard(
 ) -> list[PlayerLeaderboard]:
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
+    if account_id is not None:
+        limit = 100_000_000
     query = """
     SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank, matches_played
     FROM (SELECT account_id, anyLast(player_score) AS player_score, COUNT() AS matches_played FROM mmr_history GROUP BY account_id)
