@@ -149,11 +149,9 @@ def get_hero_win_loss_stats(
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
-class PlayerLeaderboard(BaseModel):
+class PlayerRank(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
-    leaderboard_rank: int
-    matches_played: int | None = None
 
 
 @router.get(
@@ -181,7 +179,7 @@ def get_player_rank(
     account_id: Annotated[
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
-) -> PlayerLeaderboard:
+) -> PlayerRank:
     limiter.apply_limits(
         req,
         res,
@@ -191,18 +189,18 @@ def get_player_rank(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT leaderboard.*
-    FROM (SELECT account_id, ROUND(player_score), row_number() OVER (ORDER BY player_score DESC) AS rank FROM (SELECT account_id, player_score FROM mmr_history ORDER BY account_id, match_id DESC LIMIT 1 BY account_id)) leaderboard
-    WHERE leaderboard.account_id = %(account_id)s;
+    SELECT account_id, ROUND(player_score) AS player_score
+    FROM mmr_history
+    WHERE account_id = %(account_id)s
+    ORDER BY match_id DESC
+    LIMIT 1;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"account_id": account_id})
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     result = result[0]
-    return PlayerLeaderboard(
-        account_id=result[0], player_score=int(result[1]), leaderboard_rank=result[2]
-    )
+    return PlayerRank(account_id=result[0], player_score=int(result[1]))
 
 
 class PlayerMMRHistoryEntry(BaseModel):
@@ -276,6 +274,13 @@ def get_player_mmr_history(
     ]
 
 
+class PlayerLeaderboard(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    player_score: int
+    leaderboard_rank: int
+    matches_played: int | None = None
+
+
 @router.get(
     "/leaderboard",
     response_model_exclude_none=True,
@@ -300,6 +305,7 @@ def get_leaderboard(
     res: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
+    account_id: int | None = None,
 ) -> list[PlayerLeaderboard]:
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
@@ -320,6 +326,7 @@ def get_leaderboard(
             matches_played=r[3],
         )
         for r in result
+        if account_id is None or r[0] == account_id
     ]
 
 
