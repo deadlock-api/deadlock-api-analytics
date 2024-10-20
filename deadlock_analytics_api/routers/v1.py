@@ -5,11 +5,12 @@ from typing import Annotated, Literal
 from clickhouse_driver import Client
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models import (
+from deadlock_analytics_api.models.active_match import (
     ACTIVE_MATCHES_KEYS,
     ACTIVE_MATCHES_REDUCED_KEYS,
     ActiveMatch,
 )
+from deadlock_analytics_api.models.match_metadata import MatchMetadata
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from fastapi import APIRouter, Depends, Path, Query
@@ -602,7 +603,7 @@ def get_match_metadata(
     res: Response,
     match_id: int,
     api_key: APIKey = Depends(utils.get_api_key),
-) -> JSONResponse:
+) -> MatchMetadata:
     limiter.apply_limits(
         req,
         res,
@@ -611,28 +612,25 @@ def get_match_metadata(
     )
     res.headers["Cache-Control"] = "private, max-age=3600"
     print(f"Authenticated with API key: {api_key}")
-    query = """
-    SELECT mi.match_id, mp.account_id, mi.*, mp.*
-    FROM match_info mi
-    LEFT JOIN match_player mp USING (match_id)
-    WHERE match_id = %(match_id)s
-    """
+    query = "SELECT * FROM match_info WHERE match_id = %(match_id)s LIMIT 1"
     with CH_POOL.get_client() as client:
-        results, keys = client.execute(
+        match_info, keys = client.execute(
             query, {"match_id": match_id}, with_column_types=True
         )
-    if len(results) == 0:
+    if len(match_info) == 0:
         raise HTTPException(status_code=404, detail="Match not found")
+    match_info = {k: v for (k, _), v in zip(keys, match_info[0])}
 
-    return JSONResponse(
-        content=[
-            {
-                k: v if not isinstance(v, datetime.datetime) else v.isoformat()
-                for (k, _), v in zip(keys, result)
-            }
-            for result in results
-        ]
-    )
+    query = "SELECT * FROM match_player WHERE match_id = %(match_id)s LIMIT 12"
+    with CH_POOL.get_client() as client:
+        match_players, keys = client.execute(
+            query, {"match_id": match_id}, with_column_types=True
+        )
+    if len(match_players) == 0:
+        raise HTTPException(status_code=404, detail="Match Players not found")
+    match_players = [{k: v for (k, _), v in zip(keys, row)} for row in match_players]
+
+    return MatchMetadata.from_rows(match_info, match_players)
 
 
 @router.get(
