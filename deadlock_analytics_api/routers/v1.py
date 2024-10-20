@@ -634,7 +634,7 @@ def get_match_metadata(
 
 
 @router.get(
-    "/matches",
+    "/matches/short",
     summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key with data access",
     tags=["Data API-Key required"],
 )
