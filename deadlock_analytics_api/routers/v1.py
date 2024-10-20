@@ -486,6 +486,7 @@ def match_search(
         Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
     ) = None,
     hero_id: int | None = None,
+    only_with_metadata: bool = False,
 ) -> list[ActiveMatch]:
     limiter.apply_limits(
         req,
@@ -509,12 +510,14 @@ def match_search(
     query = f"""
     SELECT DISTINCT ON(match_id) {", ".join(ACTIVE_MATCHES_KEYS)}
     FROM finished_matches
+    LEFT OUTER JOIN match_info mi ON mi.match_id = match_id
     WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
     AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
     AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     AND (%(region)s IS NULL OR region_mode = %(region)s)
     AND (%(hero_id)s IS NULL OR has(`players.hero_id`, %(hero_id)s))
     AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
+    AND (%(only_with_metadata)s = FALSE OR mi.match_id > 0)
     ORDER BY match_id
     LIMIT %(limit)s
     """
@@ -532,6 +535,7 @@ def match_search(
                 "region": region,
                 "hero_id": hero_id,
                 "match_mode": match_mode,
+                "only_with_metadata": only_with_metadata,
             },
         )
     return [ActiveMatch.from_row(row) for row in result]
