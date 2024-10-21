@@ -1,4 +1,5 @@
 import logging
+import os
 
 from deadlock_analytics_api.routers import v1
 from fastapi import FastAPI
@@ -7,7 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
 
 app = FastAPI(
     title="Analytics - Deadlock API",
