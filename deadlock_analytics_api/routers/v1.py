@@ -191,20 +191,27 @@ def get_player_rank(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, ROUND(player_score) AS player_score, finished_matches.region_mode as region_mode
+    SELECT account_id, ROUND(player_score) AS player_score
     FROM mmr_history
-    INNER JOIN finished_matches ON mmr_history.match_id = finished_matches.match_id
     WHERE account_id = %(account_id)s
     ORDER BY match_id DESC
     LIMIT 1;
     """
+    query2 = """
+    SELECT region_mode
+    FROM player_region
+    WHERE account_id = %(account_id)s
+    LIMIT 1;
+    """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"account_id": account_id})
-    if len(result) == 0:
+        result2 = client.execute(query2, {"account_id": account_id})
+    if len(result) == 0 or len(result2) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     result = result[0]
+    result2 = result2[0]
     return PlayerRank(
-        account_id=result[0], player_score=int(result[1]), region=result[2]
+        account_id=result[0], player_score=int(result[1]), region=result2[0]
     )
 
 
