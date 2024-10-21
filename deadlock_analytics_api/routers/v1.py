@@ -153,6 +153,7 @@ def get_hero_win_loss_stats(
 class PlayerRank(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
+    region: str
 
 
 @router.get(
@@ -190,8 +191,9 @@ def get_player_rank(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, ROUND(player_score) AS player_score
+    SELECT account_id, ROUND(player_score) AS player_score, finished_matches.region_mode as region_mode
     FROM mmr_history
+    INNER JOIN finished_matches ON mmr_history.match_id = finished_matches.match_id
     WHERE account_id = %(account_id)s
     ORDER BY match_id DESC
     LIMIT 1;
@@ -201,7 +203,9 @@ def get_player_rank(
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     result = result[0]
-    return PlayerRank(account_id=result[0], player_score=int(result[1]))
+    return PlayerRank(
+        account_id=result[0], player_score=int(result[1]), region=result[2]
+    )
 
 
 class PlayerMMRHistoryEntry(BaseModel):
