@@ -10,6 +10,7 @@ CH_POOL = ChPool(
     user=os.getenv("CLICKHOUSE_USER", "default"),
     password=os.getenv("CLICKHOUSE_PASSWORD", ""),
     database=os.getenv("CLICKHOUSE_DB", "default"),
+    connections_max=300,
 )
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "redis")
