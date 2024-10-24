@@ -509,7 +509,10 @@ def get_matches_by_account_id(
         result = client.execute(query, {"account_id": account_id})
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Not found")
-    return [{"match_id": r[0], "start_time": r[1].isoformat()} for r in result]
+    return [
+        {"match_id": r[0], "start_time": r[1].isoformat(), "ranked_badge_level": r[2]}
+        for r in result
+    ]
 
 
 @router.get(
