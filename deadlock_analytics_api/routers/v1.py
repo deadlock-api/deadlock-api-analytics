@@ -48,6 +48,34 @@ def get_match_score_distribution(
     return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
 
 
+class MatchBadgeLevelDistribution(BaseModel):
+    match_badge_level: int
+    count: int
+
+
+@router.get("/match-badge-level-distribution", summary="RateLimit: 10req/s")
+def get_match_badge_level_distribution(
+    req: Request, res: Response
+) -> list[MatchBadgeLevelDistribution]:
+    limiter.apply_limits(
+        req, res, "/v1/match-score-distribution", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    query = """
+    SELECT ranked_badge_level, COUNT(DISTINCT match_id) as match_score_count
+    FROM finished_matches
+    WHERE ranked_badge_level IS NOT NULL
+    GROUP BY ranked_badge_level
+    ORDER BY ranked_badge_level;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
+    return [
+        MatchBadgeLevelDistribution(match_badge_level=row[0], count=row[1])
+        for row in result
+    ]
+
+
 class PlayerScoreDistribution(BaseModel):
     player_score: int
     count: int
