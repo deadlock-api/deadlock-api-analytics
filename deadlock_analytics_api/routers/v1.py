@@ -154,6 +154,7 @@ class PlayerRank(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
     region: str
+    match_ranked_badge_level: int | None = Field(None)
 
 
 @router.get(
@@ -191,7 +192,7 @@ def get_player_rank(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, ROUND(player_score) AS player_score
+    SELECT account_id, ROUND(player_score) AS player_score, ranked_badge_level
     FROM mmr_history
     WHERE account_id = %(account_id)s
     ORDER BY match_id DESC
@@ -211,7 +212,10 @@ def get_player_rank(
     result = result[0]
     result2 = result2[0]
     return PlayerRank(
-        account_id=result[0], player_score=int(result[1]), region=result2[0]
+        account_id=result[0],
+        player_score=int(result[1]),
+        region=result2[0],
+        match_ranked_badge_level=result[2],
     )
 
 
