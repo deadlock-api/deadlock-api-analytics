@@ -238,7 +238,7 @@ Ranks update in 1min intervals.
 
 As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
 """,
-    summary="RateLimit: 10req/s & 100req/10min, API-Key RateLimit: 1000req/s",
+    summary="RateLimit: 10req/s & 100req/10min, API-Key RateLimit: 100req/s & 1000req/10min",
 )
 def get_player_mmr_history(
     req: Request,
@@ -252,7 +252,7 @@ def get_player_mmr_history(
         res,
         "/v1/players/{account_id}/mmr-history",
         [RateLimit(limit=10, period=1), RateLimit(limit=100, period=600)],
-        [RateLimit(limit=1000, period=1)],
+        [RateLimit(limit=100, period=1), RateLimit(limit=1000, period=600)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
