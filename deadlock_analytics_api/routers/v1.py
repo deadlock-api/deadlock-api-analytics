@@ -688,11 +688,12 @@ def get_all_finished_matches(
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
     FROM finished_matches
+    ARRAY JOIN players
     WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
     AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
     AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     AND (%(region)s IS NULL OR region_mode = %(region)s)
-    AND (%(hero_id)s IS NULL OR has(`players.hero_id`, %(hero_id)s))
+    AND (%(hero_id)s IS NULL OR players.hero_id = %(hero_id)s)
     AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
     AND start_time < now() - INTERVAL '1 day'
     LIMIT %(limit)s

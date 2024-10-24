@@ -26,10 +26,10 @@ ACTIVE_MATCHES_KEYS = [
 ]
 
 ACTIVE_MATCHES_REDUCED_KEYS = [
-    "`players.team`",
-    "`players.account_id`",
-    "`players.abandoned`",
-    "`players.hero_id`",
+    "players.team",
+    "players.account_id",
+    "players.abandoned",
+    "players.hero_id",
     "start_time",
     "match_id",
     "net_worth_team_0",
