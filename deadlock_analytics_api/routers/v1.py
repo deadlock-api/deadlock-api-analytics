@@ -220,6 +220,7 @@ class PlayerMMRHistoryEntry(BaseModel):
     match_id: int
     match_start_time: str
     player_score: int
+    match_ranked_badge_level: int | None = Field(None)
 
 
 @router.get(
@@ -256,7 +257,7 @@ def get_player_mmr_history(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, match_id, ROUND(player_score)
+    SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
     FROM mmr_history
     WHERE account_id = %(account_id)s
     ORDER BY match_id DESC;
@@ -281,6 +282,7 @@ def get_player_mmr_history(
             match_id=r[1],
             match_start_time=match_id_start_time[r[1]].isoformat(),
             player_score=r[2],
+            match_ranked_badge_level=r[3],
         )
         for r in result
     ]
