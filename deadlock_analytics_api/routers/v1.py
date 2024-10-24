@@ -642,8 +642,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
 
 @router.get(
     "/matches/{match_id}/metadata",
-    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to use this endpoint",
-    tags=["API-Key required"],
+    summary="RateLimit: 100req/min",
 )
 def get_match_metadata(
     req: Request,
@@ -654,7 +653,6 @@ def get_match_metadata(
         req,
         res,
         "/v1/matches/{match_id}/metadata",
-        [RateLimit(limit=10, period=60), RateLimit(limit=100, period=3600)],
         [RateLimit(limit=100, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
