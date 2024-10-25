@@ -117,6 +117,41 @@ def get_player_score_distribution(
     ]
 
 
+class PlayerBadgeLevelDistribution(BaseModel):
+    player_badge_level: int
+    count: int
+
+
+@router.get("/player-badge-level-distribution", summary="RateLimit: 10req/s")
+def get_player_badge_level_distribution(
+    req: Request, res: Response
+) -> list[PlayerBadgeLevelDistribution]:
+    limiter.apply_limits(
+        req, res, "/v1/player-badge-level-distribution", [RateLimit(limit=10, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    query = """
+    WITH ranked_badge AS (
+        SELECT ranked_badge_level
+        FROM player_card
+        WHERE ranked_badge_level > 0
+        ORDER BY created_at
+        LIMIT 1 BY account_id
+    )
+    SELECT ranked_badge_level, COUNT(*) AS count
+    FROM ranked_badge
+    WHERE ranked_badge_level > 0
+    GROUP BY ranked_badge_level
+    ORDER BY ranked_badge_level;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
+    return [
+        PlayerBadgeLevelDistribution(player_badge_level=row[0], count=row[1])
+        for row in result
+    ]
+
+
 class RegionDistribution(BaseModel):
     region: str
     count: int
