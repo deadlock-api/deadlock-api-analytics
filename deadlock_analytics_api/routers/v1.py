@@ -822,7 +822,6 @@ def get_recent_matches(
     FROM finished_matches
     WHERE start_time < now() - INTERVAL '1 hour'
         AND start_time > now() - INTERVAL '7 days'
-        AND start_time > '2024-10-11 06:00:00'
         AND match_id NOT IN (SELECT match_id FROM match_salts)
     ORDER BY start_time
     LIMIT 10000
