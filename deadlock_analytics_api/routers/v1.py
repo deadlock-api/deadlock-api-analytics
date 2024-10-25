@@ -56,18 +56,14 @@ class MatchBadgeLevelDistribution(BaseModel):
     @property
     def match_ranked_rank(self) -> int | None:
         return (
-            self.match_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
+            self.match_badge_level // 10 if self.match_badge_level is not None else None
         )
 
     @computed_field
     @property
     def match_ranked_subrank(self) -> int | None:
         return (
-            self.match_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
+            self.match_badge_level % 10 if self.match_badge_level is not None else None
         )
 
 
