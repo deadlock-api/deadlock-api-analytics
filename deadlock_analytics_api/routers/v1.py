@@ -1,5 +1,4 @@
 import datetime
-import math
 import os
 from typing import Annotated, Literal
 
@@ -57,7 +56,7 @@ class MatchBadgeLevelDistribution(BaseModel):
     @property
     def match_ranked_rank(self) -> int | None:
         return (
-            math.floor(self.match_badge_level / 10)
+            self.match_badge_level // 10
             if self.match_ranked_badge_level is not None
             else None
         )
@@ -207,7 +206,7 @@ class PlayerRank(BaseModel):
     @property
     def match_ranked_rank(self) -> int | None:
         return (
-            math.floor(self.match_ranked_badge_level / 10)
+            self.match_ranked_badge_level // 10
             if self.match_ranked_badge_level is not None
             else None
         )
@@ -295,7 +294,7 @@ class PlayerMMRHistoryEntry(BaseModel):
     @property
     def match_ranked_rank(self) -> int | None:
         return (
-            math.floor(self.match_ranked_badge_level / 10)
+            self.match_ranked_badge_level // 10
             if self.match_ranked_badge_level is not None
             else None
         )
