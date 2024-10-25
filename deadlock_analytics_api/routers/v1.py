@@ -347,10 +347,10 @@ def get_leaderboard(
     FROM leaderboard
     LEFT JOIN player_card pc USING account_id
     WHERE %(account_id)s IS NULL OR account_id = %(account_id)s
-    AND rank >= %(start)s
     ORDER BY rank
     LIMIT 1 by account_id
-    LIMIT %(limit)s;
+    LIMIT %(limit)s
+    OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(
