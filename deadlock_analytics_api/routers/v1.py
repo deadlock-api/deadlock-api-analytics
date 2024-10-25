@@ -375,6 +375,25 @@ class PlayerLeaderboard(BaseModel):
     player_score: int
     leaderboard_rank: int
     matches_played: int | None = None
+    ranked_badge_level: int | None = None
+
+    @computed_field
+    @property
+    def ranked_rank(self) -> int | None:
+        return (
+            self.ranked_badge_level // 10
+            if self.ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def ranked_subrank(self) -> int | None:
+        return (
+            self.ranked_badge_level % 10
+            if self.ranked_badge_level is not None
+            else None
+        )
 
 
 @router.get(
@@ -409,12 +428,14 @@ def get_leaderboard(
         limit = 100_000_000
         start = 1
     query = """
-    SELECT account_id, player_score, rank, matches_played
+    SELECT account_id, player_score, rank, matches_played, pc.ranked_badge_level
     FROM leaderboard
+    LEFT JOIN player_card pc USING account_id
     WHERE %(account_id)s IS NULL OR account_id = %(account_id)s
+    AND rank >= %(start)s
     ORDER BY rank
-    LIMIT %(limit)s
-    OFFSET %(start)s;
+    LIMIT 1 by account_id
+    LIMIT %(limit)s;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(
@@ -426,6 +447,7 @@ def get_leaderboard(
             player_score=int(r[1]),
             leaderboard_rank=r[2],
             matches_played=r[3],
+            ranked_badge_level=r[4],
         )
         for r in result
     ]
@@ -462,8 +484,9 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played
+    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, pc.ranked_badge_level
     FROM leaderboard
+    LEFT JOIN player_card pc USING account_id
     WHERE region_mode = %(region)s
     ORDER BY rank
     LIMIT %(limit)s
@@ -479,6 +502,7 @@ def get_leaderboard_by_region(
             player_score=int(r[1]),
             leaderboard_rank=r[2],
             matches_played=r[3],
+            ranked_badge_level=r[4],
         )
         for r in result
     ]
