@@ -192,31 +192,6 @@ def get_hero_win_loss_stats(
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
-class PlayerRank(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    player_score: int
-    region: str
-    match_ranked_badge_level: int | None = Field(None)
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-
 class PlayerMMRHistoryEntry(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     match_id: int
