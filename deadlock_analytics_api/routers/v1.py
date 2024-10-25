@@ -1,4 +1,5 @@
 import datetime
+import math
 import os
 from typing import Annotated, Literal
 
@@ -15,7 +16,7 @@ from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
@@ -51,6 +52,20 @@ def get_match_score_distribution(
 class MatchBadgeLevelDistribution(BaseModel):
     match_badge_level: int
     count: int
+
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            math.floor(self.match_badge_level / 10)
+            if self.match_ranked_badge_level
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return self.match_badge_level % 10 if self.match_ranked_badge_level else None
 
 
 @router.get("/match-badge-level-distribution", summary="RateLimit: 10req/s")
@@ -184,6 +199,24 @@ class PlayerRank(BaseModel):
     region: str
     match_ranked_badge_level: int | None = Field(None)
 
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            math.floor(self.match_ranked_badge_level / 10)
+            if self.match_ranked_badge_level
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level % 10
+            if self.match_ranked_badge_level
+            else None
+        )
+
 
 @router.get(
     "/players/{account_id}/rank",
@@ -253,6 +286,24 @@ class PlayerMMRHistoryEntry(BaseModel):
     match_start_time: str
     player_score: int
     match_ranked_badge_level: int | None = Field(None)
+
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            math.floor(self.match_ranked_badge_level / 10)
+            if self.match_ranked_badge_level
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level % 10
+            if self.match_ranked_badge_level
+            else None
+        )
 
 
 @router.get(
