@@ -58,14 +58,18 @@ class MatchBadgeLevelDistribution(BaseModel):
     def match_ranked_rank(self) -> int | None:
         return (
             math.floor(self.match_badge_level / 10)
-            if self.match_ranked_badge_level
+            if self.match_ranked_badge_level is not None
             else None
         )
 
     @computed_field
     @property
     def match_ranked_subrank(self) -> int | None:
-        return self.match_badge_level % 10 if self.match_ranked_badge_level else None
+        return (
+            self.match_badge_level % 10
+            if self.match_ranked_badge_level is not None
+            else None
+        )
 
 
 @router.get("/match-badge-level-distribution", summary="RateLimit: 10req/s")
@@ -204,7 +208,7 @@ class PlayerRank(BaseModel):
     def match_ranked_rank(self) -> int | None:
         return (
             math.floor(self.match_ranked_badge_level / 10)
-            if self.match_ranked_badge_level
+            if self.match_ranked_badge_level is not None
             else None
         )
 
@@ -213,7 +217,7 @@ class PlayerRank(BaseModel):
     def match_ranked_subrank(self) -> int | None:
         return (
             self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level
+            if self.match_ranked_badge_level is not None
             else None
         )
 
@@ -292,7 +296,7 @@ class PlayerMMRHistoryEntry(BaseModel):
     def match_ranked_rank(self) -> int | None:
         return (
             math.floor(self.match_ranked_badge_level / 10)
-            if self.match_ranked_badge_level
+            if self.match_ranked_badge_level is not None
             else None
         )
 
@@ -301,7 +305,7 @@ class PlayerMMRHistoryEntry(BaseModel):
     def match_ranked_subrank(self) -> int | None:
         return (
             self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level
+            if self.match_ranked_badge_level is not None
             else None
         )
 
