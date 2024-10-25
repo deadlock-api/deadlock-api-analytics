@@ -500,7 +500,7 @@ def get_matches_by_account_id(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT match_id, start_time
+    SELECT match_id, start_time, ranked_badge_level
     FROM finished_matches
     ARRAY JOIN players
     WHERE players.account_id = %(account_id)s
