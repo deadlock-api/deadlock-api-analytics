@@ -217,72 +217,11 @@ class PlayerRank(BaseModel):
         )
 
 
-@router.get(
-    "/players/{account_id}/rank",
-    response_model_exclude_none=True,
-    description="""
-# ⚠️ Use with Responsibility ⚠️
-
-As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
-
-# Description
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
-It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
-With this algorithm we match the Glicko rating system used in the game very closely.
-
-Ranks update in 1min intervals.
-
-As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
-""",
-    summary="RateLimit: 1000req/s",
-)
-def get_player_rank(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> PlayerRank:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/players/{account_id}/rank",
-        [RateLimit(limit=1000, period=1)],
-        [RateLimit(limit=10000, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT account_id, ROUND(player_score) AS player_score, ranked_badge_level
-    FROM mmr_history
-    WHERE account_id = %(account_id)s
-    ORDER BY match_id DESC
-    LIMIT 1;
-    """
-    query2 = """
-    SELECT region_mode
-    FROM player_region
-    WHERE account_id = %(account_id)s
-    LIMIT 1;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
-        result2 = client.execute(query2, {"account_id": account_id})
-    if len(result) == 0 or len(result2) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    result = result[0]
-    result2 = result2[0]
-    return PlayerRank(
-        account_id=result[0],
-        player_score=int(result[1]),
-        region=result2[0],
-        match_ranked_badge_level=result[2],
-    )
-
-
 class PlayerMMRHistoryEntry(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     match_id: int
     match_start_time: str
+    region_mode: str
     player_score: int
     match_ranked_badge_level: int | None = Field(None)
 
@@ -350,19 +289,20 @@ def get_player_mmr_history(
         raise HTTPException(status_code=404, detail="Player not found")
     match_ids = [r[1] for r in result]
     query = """
-    SELECT match_id, start_time
+    SELECT match_id, start_time, region_mode
     FROM active_matches
     WHERE match_id IN %(match_ids)s
     LIMIT 1 BY match_id;
     """
     with CH_POOL.get_client() as client:
         result2 = client.execute(query, {"match_ids": match_ids})
-    match_id_start_time = {r[0]: r[1] for r in result2}
+    match_id_start_time = {r[0]: (r[1], r[2]) for r in result2}
     return [
         PlayerMMRHistoryEntry(
             account_id=r[0],
             match_id=r[1],
-            match_start_time=match_id_start_time[r[1]].isoformat(),
+            match_start_time=match_id_start_time[r[1]][0].isoformat(),
+            region_mode=match_id_start_time[r[1]][1],
             player_score=r[2],
             match_ranked_badge_level=r[3],
         )
