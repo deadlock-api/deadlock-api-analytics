@@ -673,7 +673,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
         res,
         "/v1/matches/{match_id}/short",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-        [RateLimit(limit=100, period=60)],
+        [RateLimit(limit=100, period=10)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
