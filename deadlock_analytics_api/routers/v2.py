@@ -120,7 +120,13 @@ def get_leaderboard_by_region(
 
 
 @router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s")
-def get_hero_win_loss_stats(req: Request, res: Response) -> list[HeroWinLossStat]:
+def get_hero_win_loss_stats(
+    req: Request,
+    res: Response,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
+) -> list[HeroWinLossStat]:
     limiter.apply_limits(
         req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
     )
@@ -128,9 +134,11 @@ def get_hero_win_loss_stats(req: Request, res: Response) -> list[HeroWinLossStat
     query = """
     SELECT hero_id, SUM(wins) AS total_wins, SUM(total) - SUM(wins) AS total_losses
     FROM hero_player_winrate
+    INNER JOIN player_region USING (account_id)
+    WHERE %(region)s is NULL or region_mode = %(region)s
     GROUP BY hero_id
     ORDER BY total_wins + total_losses DESC;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query)
+        result = client.execute(query, {"region": region})
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
