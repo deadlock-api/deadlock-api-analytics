@@ -1,7 +1,7 @@
 import logging
 import os
 
-from deadlock_analytics_api.routers import v1, v2
+from deadlock_analytics_api.routers import internal, v1, v2
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -44,6 +44,7 @@ Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 app.include_router(v2.router)
 app.include_router(v1.router)
+app.include_router(internal.router)
 
 
 @app.get("/", include_in_schema=False)
