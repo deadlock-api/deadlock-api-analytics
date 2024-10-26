@@ -155,7 +155,7 @@ class HeroWinLossStat(BaseModel):
     losses: int
 
 
-@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s")
+@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s", deprecated=True)
 def get_hero_win_loss_stats(
     req: Request,
     res: Response,
