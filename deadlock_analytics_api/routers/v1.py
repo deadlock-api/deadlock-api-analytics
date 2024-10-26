@@ -279,7 +279,7 @@ def get_player_mmr_history(
     ]
 
 
-class PlayerLeaderboard(BaseModel):
+class PlayerLeaderboardV1(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     player_score: int
     leaderboard_rank: int
@@ -317,7 +317,7 @@ def get_leaderboard(
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
     account_id: int | None = None,
-) -> list[PlayerLeaderboard]:
+) -> list[PlayerLeaderboardV1]:
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
@@ -342,7 +342,7 @@ def get_leaderboard(
             query, {"start": start - 1, "limit": limit, "account_id": account_id}
         )
     return [
-        PlayerLeaderboard(
+        PlayerLeaderboardV1(
             account_id=r[0],
             player_score=int(r[1]),
             leaderboard_rank=r[2],
@@ -365,7 +365,7 @@ def get_leaderboard_by_region(
     region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
-) -> list[PlayerLeaderboard]:
+) -> list[PlayerLeaderboardV1]:
     limiter.apply_limits(
         req, res, "/v1/leaderboard/{region}", [RateLimit(limit=10, period=1)]
     )
@@ -383,7 +383,7 @@ def get_leaderboard_by_region(
             query, {"start": start - 1, "limit": limit, "region": region}
         )
     return [
-        PlayerLeaderboard(
+        PlayerLeaderboardV1(
             account_id=r[0],
             player_score=int(r[1]),
             leaderboard_rank=r[2],
