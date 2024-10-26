@@ -375,17 +375,22 @@ def get_leaderboard(
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
-        limit = 100_000_000
-        start = 1
-    query = """
-    SELECT account_id, player_score, rank, matches_played, ranked_badge_level
-    FROM leaderboard
-    WHERE %(account_id)s IS NULL OR account_id = %(account_id)s
-    ORDER BY rank
-    LIMIT 1 by account_id
-    LIMIT %(limit)s
-    OFFSET %(start)s;
-    """
+        query = """
+        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
+        FROM leaderboard_account
+        WHERE account_id = %(account_id)s
+        ORDER BY rank
+        LIMIT 1;
+        """
+    else:
+        query = """
+        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
+        FROM leaderboard
+        ORDER BY rank
+        LIMIT 1 by account_id
+        LIMIT %(limit)s
+        OFFSET %(start)s;
+        """
     with CH_POOL.get_client() as client:
         result = client.execute(
             query, {"start": start - 1, "limit": limit, "account_id": account_id}
