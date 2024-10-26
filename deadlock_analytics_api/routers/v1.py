@@ -777,39 +777,6 @@ def get_all_finished_matches(
     return StreamingResponse(stream())
 
 
-class MatchScore(BaseModel):
-    start_time: datetime.datetime
-    match_id: int
-    match_score: int
-
-
-@router.get("/matches/{match_id}/score", summary="RateLimit: 100/s")
-def get_match_score(
-    req: Request,
-    res: Response,
-    match_id: int,
-) -> MatchScore:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/{match_id}/score",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = """
-    SELECT start_time, match_id, match_score
-    FROM finished_matches
-    WHERE match_id = %(match_id)s
-    LIMIT 1
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"match_id": match_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Match not found")
-    result = result[0]
-    return MatchScore(start_time=result[0], match_id=result[1], match_score=result[2])
-
-
 @router.get("/recent-matches", tags=["Internal API-Key required"])
 def get_recent_matches(
     response: Response,
