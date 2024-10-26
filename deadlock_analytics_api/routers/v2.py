@@ -97,7 +97,7 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, dense_rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level
+    SELECT account_id, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level
     FROM leaderboard_v2
     WHERE region_mode = %(region)s
     ORDER BY rank
