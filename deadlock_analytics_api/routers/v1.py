@@ -20,7 +20,7 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/v1", tags=["V1"])
 
 
 class MatchScoreDistribution(BaseModel):
@@ -229,20 +229,6 @@ class PlayerMMRHistoryEntry(BaseModel):
 
 @router.get(
     "/players/{account_id}/mmr-history",
-    description="""
-# ⚠️ Use with Responsibility ⚠️
-
-As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
-
-# Description
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
-It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
-With this algorithm we match the Glicko rating system used in the game very closely.
-
-Ranks update in 1min intervals.
-
-As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
-""",
     summary="RateLimit: 10req/s & 500req/10min, API-Key RateLimit: 100req/s & 1000req/10min",
 )
 def get_player_mmr_history(
@@ -322,20 +308,7 @@ class PlayerLeaderboard(BaseModel):
 @router.get(
     "/leaderboard",
     response_model_exclude_none=True,
-    description="""
-# ⚠️ Use with Responsibility ⚠️
-
-As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
-
-# Description
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
-It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
-With this algorithm we match the Glicko rating system used in the game very closely.
-
-Ranks update in 1min intervals.
-
-As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
-""",
+    deprecated=True,
     summary="RateLimit: 10req/s",
 )
 def get_leaderboard(
@@ -383,20 +356,7 @@ def get_leaderboard(
 @router.get(
     "/leaderboard/{region}",
     response_model_exclude_none=True,
-    description="""
-# ⚠️ Use with Responsibility ⚠️
-
-As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
-
-# Description
-As there is no way to get the real rank of a player in the game, this endpoint uses the match scores of stored matches (collected from spectate tab).
-It runs a regression algorithm to calculate the MMR of each player and then ranks them by their MMR.
-With this algorithm we match the Glicko rating system used in the game very closely.
-
-Ranks update in 1min intervals.
-
-As the calculation uses the match_score, it updates when a player starts a new match and will always be one match behind the real rank.
-""",
+    deprecated=True,
     summary="RateLimit: 10req/s",
 )
 def get_leaderboard_by_region(
@@ -443,13 +403,6 @@ class HeroLeaderboard(BaseModel):
 
 @router.get(
     "/hero-leaderboard/{hero_id}",
-    description="""
-# ⚠️ Use with Responsibility ⚠️
-
-As soon as I see someone abusing this endpoint, I will make it a private (api-key only) endpoint. If you wanna be safe against that, contact me on discord (manuelhexe) and I will give you an API key.
-
-Ranks update in 10min intervals.
-""",
     summary="RateLimit: 10req/s",
 )
 def get_hero_leaderboard(
