@@ -90,33 +90,6 @@ def get_match_badge_level_distribution(
     ]
 
 
-class PlayerScoreDistribution(BaseModel):
-    player_score: int
-    count: int
-
-
-@router.get("/player-score-distribution", summary="RateLimit: 10req/s")
-def get_player_score_distribution(
-    req: Request, res: Response, mode: Literal["all", "Ranked", "Unranked"] = "all"
-) -> list[PlayerScoreDistribution]:
-    limiter.apply_limits(
-        req, res, "/v1/player-score-distribution", [RateLimit(limit=10, period=1)]
-    )
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = """
-    SELECT ROUND(player_score) as score, COUNT(DISTINCT account_id) as match_score_count
-    FROM mmr_history
-    WHERE score > 400 AND (%(mode)s IS NULL OR match_mode = %(mode)s)
-    GROUP BY score
-    ORDER BY score;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"mode": mode if mode != "all" else None})
-    return [
-        PlayerScoreDistribution(player_score=row[0], count=row[1]) for row in result
-    ]
-
-
 class PlayerBadgeLevelDistribution(BaseModel):
     player_badge_level: int
     count: int
