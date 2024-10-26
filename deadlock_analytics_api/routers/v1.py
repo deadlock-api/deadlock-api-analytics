@@ -378,9 +378,8 @@ def get_leaderboard(
         limit = 100_000_000
         start = 1
     query = """
-    SELECT account_id, player_score, rank, matches_played, pc.ranked_badge_level
+    SELECT account_id, player_score, rank, matches_played, ranked_badge_level
     FROM leaderboard
-    LEFT JOIN player_card pc USING account_id
     WHERE %(account_id)s IS NULL OR account_id = %(account_id)s
     ORDER BY rank
     LIMIT 1 by account_id
@@ -434,9 +433,8 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, pc.ranked_badge_level
+    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, ranked_badge_level
     FROM leaderboard
-    LEFT JOIN player_card pc USING account_id
     WHERE region_mode = %(region)s
     ORDER BY rank
     LIMIT %(limit)s
