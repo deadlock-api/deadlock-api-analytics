@@ -547,7 +547,7 @@ def match_search(
 
 @router.get(
     "/matches/{match_id}/short",
-    summary="RateLimit: 1000req/min 10000req/hour, API-Key Ratelimit: 1000req/min",
+    summary="RateLimit: 1000req/min 10000req/hour, API-Key RateLimit: 1000req/min",
 )
 def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     limiter.apply_limits(
@@ -574,7 +574,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
 
 @router.get(
     "/matches/{match_id}/timestamps",
-    summary="RateLimit: 1000req/min 10000req/hour, API-Key Ratelimit: 1000req/min",
+    summary="RateLimit: 1000req/min 10000req/hour, API-Key RateLimit: 1000req/min",
 )
 def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
     limiter.apply_limits(
