@@ -15,6 +15,7 @@ router = APIRouter(prefix="/v2", tags=["V2"])
 
 class PlayerLeaderboardV2(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    region_mode: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"]
     leaderboard_rank: int
     ranked_badge_level: int | None = None
 
@@ -53,7 +54,7 @@ def get_leaderboard(
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
         query = """
-        SELECT account_id, rank, ranked_badge_level
+        SELECT account_id, region_mode, rank, ranked_badge_level
         FROM leaderboard_account_v2
         WHERE account_id = %(account_id)s
         ORDER BY rank
@@ -61,7 +62,7 @@ def get_leaderboard(
         """
     else:
         query = """
-        SELECT account_id, rank, ranked_badge_level
+        SELECT account_id, region_mode, rank, ranked_badge_level
         FROM leaderboard_v2
         ORDER BY rank
         LIMIT 1 by account_id
@@ -75,8 +76,9 @@ def get_leaderboard(
     return [
         PlayerLeaderboardV2(
             account_id=r[0],
-            leaderboard_rank=r[1],
-            ranked_badge_level=r[2],
+            region_mode=r[1],
+            leaderboard_rank=r[2],
+            ranked_badge_level=r[3],
         )
         for r in result
     ]
@@ -99,7 +101,7 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level
+    SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level
     FROM leaderboard_v2
     WHERE region_mode = %(region)s
     ORDER BY rank
@@ -113,8 +115,9 @@ def get_leaderboard_by_region(
     return [
         PlayerLeaderboardV2(
             account_id=r[0],
-            leaderboard_rank=r[1],
-            ranked_badge_level=r[2],
+            region_mode=r[1],
+            leaderboard_rank=r[2],
+            ranked_badge_level=r[3],
         )
         for r in result
     ]
