@@ -153,8 +153,8 @@ class PlayerCardSlot(BaseModel):
     hero_id: int
     hero_kills: int
     hero_wins: int
-    stat_id: int
-    stat_score: int
+    # stat_id: int # Always 0
+    # stat_score: int # Always 0
 
 
 class PlayerCardHistoryEntry(BaseModel):
