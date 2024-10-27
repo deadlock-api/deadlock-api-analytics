@@ -22,7 +22,7 @@ def get_recent_matches(
     WHERE start_time < now() - INTERVAL '1 hour'
         AND start_time > now() - INTERVAL '7 days'
         AND match_id NOT IN (SELECT match_id FROM match_salts)
-    ORDER BY start_time
+    ORDER BY start_time DESC
     LIMIT 10000
     """
     with CH_POOL.get_client() as client:
