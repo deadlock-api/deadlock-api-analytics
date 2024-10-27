@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.routers.v1 import HeroWinLossStat
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field, computed_field
 from starlette.requests import Request
 from starlette.responses import Response
@@ -142,3 +143,87 @@ def get_hero_win_loss_stats(
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"region": region})
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+
+
+class PlayerCardSlot(BaseModel):
+    slots_id: int
+    hero_id: int
+    hero_kills: int
+    hero_wins: int
+    stat_id: int
+    stat_score: int
+
+
+class PlayerCardHistoryEntry(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    created_at: datetime
+    slots: list[PlayerCardSlot]
+    ranked_badge_level: int
+
+    @classmethod
+    def from_row(cls, row) -> "PlayerCardHistoryEntry":
+        return cls(
+            slots=[
+                PlayerCardSlot(
+                    **{
+                        k.replace("slots_", "", 1): v[0] if isinstance(v, list) else v
+                        for k, v in row.items()
+                        if k.startswith("slots_")
+                    }
+                )
+            ],
+            **{k: v for k, v in row.items() if not k.startswith("slots_")},
+        )
+
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            self.ranked_badge_level // 10
+            if self.ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return (
+            self.ranked_badge_level % 10
+            if self.ranked_badge_level is not None
+            else None
+        )
+
+
+@router.get(
+    "/players/{account_id}/card-history",
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 10req/s",
+)
+def get_player_card_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerCardHistoryEntry]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/{account_id}/card-history",
+        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT *
+    FROM player_card
+    WHERE account_id = %(account_id)s
+    ORDER BY created_at DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result, keys = client.execute(
+            query, {"account_id": account_id}, with_column_types=True
+        )
+    result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return [PlayerCardHistoryEntry.from_row(r) for r in result]
