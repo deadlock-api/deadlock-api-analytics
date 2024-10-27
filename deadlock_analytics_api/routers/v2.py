@@ -230,3 +230,82 @@ def get_player_card_history(
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     return [PlayerCardHistoryEntry.from_row(r) for r in result]
+
+
+class PlayerMMRHistoryEntryV2(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    match_id: int
+    has_metadata: bool = Field(False)
+    match_ranked_badge_level: int | None = Field(None)
+
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level // 10
+            if self.match_ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level % 10
+            if self.match_ranked_badge_level is not None
+            else None
+        )
+
+
+@router.get(
+    "/players/{account_id}/mmr-history",
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
+)
+def get_player_mmr_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerMMRHistoryEntryV2]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/{account_id}/mmr-history",
+        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
+        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    WITH full_mmr_history AS (
+        SELECT match_id, ranked_badge_level, true as has_metadata
+        FROM match_player
+        WHERE account_id = 111200932
+
+        UNION DISTINCT
+
+        SELECT match_id, ranked_badge_level, false as has_metadata
+        FROM mmr_history
+        WHERE account_id = %(account_id)s AND match_id NOT IN (
+            SELECT match_id
+            FROM match_player
+            WHERE account_id = %(account_id)s
+        )
+    )
+    SELECT DISTINCT ON(match_id) match_id, ranked_badge_level, has_metadata
+    FROM full_mmr_history
+    ORDER BY match_id DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return [
+        PlayerMMRHistoryEntryV2(
+            account_id=account_id,
+            match_id=r[0],
+            match_ranked_badge_level=r[1],
+            has_metadata=r[2],
+        )
+        for r in result
+    ]
