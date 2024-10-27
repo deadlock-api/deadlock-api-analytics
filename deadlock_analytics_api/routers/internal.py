@@ -23,10 +23,21 @@ def get_recent_matches(
         AND start_time > now() - INTERVAL '7 days'
         AND match_id NOT IN (SELECT match_id FROM match_salts)
     ORDER BY start_time DESC
-    LIMIT 1000
+    LIMIT %(limit)s
     """
+    query2 = """
+    WITH (SELECT MIN(match_id) as min_match_id, MAX(match_id) as max_match_id FROM finished_matches WHERE start_time < now() - INTERVAL 2 HOUR AND start_time > now() - INTERVAL 7 DAY) AS match_range
+    SELECT number + match_range.min_match_id as match_id
+    FROM numbers(match_range.max_match_id - match_range.min_match_id + 1)
+    WHERE (number + match_range.min_match_id) NOT IN (SELECT match_id FROM match_salts)
+    ORDER BY match_id
+    LIMIT %(limit)s
+    """
+    batch_size = 1000
     with CH_POOL.get_client() as client:
-        result = client.execute(query)
+        result = client.execute(query, {"limit": batch_size})
+        if len(result) < batch_size:
+            result += client.execute(query2, {"limit": batch_size - len(result)})
     return JSONResponse(content=[{"match_id": r[0]} for r in result])
 
 
