@@ -39,7 +39,7 @@ class PlayerLeaderboardV2(BaseModel):
 @router.get(
     "/leaderboard",
     response_model_exclude_none=True,
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_leaderboard(
     req: Request,
@@ -48,7 +48,7 @@ def get_leaderboard(
     limit: Annotated[int, Query(le=10000)] = 1000,
     account_id: int | None = None,
 ) -> list[PlayerLeaderboardV2]:
-    limiter.apply_limits(req, res, "/v2/leaderboard", [RateLimit(limit=10, period=1)])
+    limiter.apply_limits(req, res, "/v2/leaderboard", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
         query = """
@@ -84,7 +84,7 @@ def get_leaderboard(
 @router.get(
     "/leaderboard/{region}",
     response_model_exclude_none=True,
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_leaderboard_by_region(
     req: Request,
@@ -94,7 +94,7 @@ def get_leaderboard_by_region(
     limit: Annotated[int, Query(le=10000)] = 1000,
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(
-        req, res, "/v2/leaderboard/{region}", [RateLimit(limit=10, period=1)]
+        req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """

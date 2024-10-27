@@ -95,12 +95,15 @@ class PlayerBadgeLevelDistribution(BaseModel):
     count: int
 
 
-@router.get("/player-badge-level-distribution", summary="RateLimit: 10req/s")
+@router.get("/player-badge-level-distribution", summary="RateLimit: 100req/s")
 def get_player_badge_level_distribution(
     req: Request, res: Response, unix_timestamp: int | None = None
 ) -> list[PlayerBadgeLevelDistribution]:
     limiter.apply_limits(
-        req, res, "/v1/player-badge-level-distribution", [RateLimit(limit=10, period=1)]
+        req,
+        res,
+        "/v1/player-badge-level-distribution",
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
@@ -130,12 +133,12 @@ class RegionDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-region-distribution", summary="RateLimit: 10req/s")
+@router.get("/match-region-distribution", summary="RateLimit: 100req/s")
 def get_match_region_distribution(
     req: Request, res: Response
 ) -> list[RegionDistribution]:
     limiter.apply_limits(
-        req, res, "/v1/match-region-distribution", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/match-region-distribution", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
@@ -229,7 +232,7 @@ class PlayerMMRHistoryEntry(BaseModel):
 
 @router.get(
     "/players/{account_id}/mmr-history",
-    summary="RateLimit: 10req/s & 500req/10min, API-Key RateLimit: 100req/s & 1000req/10min",
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
 )
 def get_player_mmr_history(
     req: Request,
@@ -242,8 +245,8 @@ def get_player_mmr_history(
         req,
         res,
         "/v1/players/{account_id}/mmr-history",
-        [RateLimit(limit=10, period=1), RateLimit(limit=500, period=600)],
-        [RateLimit(limit=100, period=1), RateLimit(limit=1000, period=600)],
+        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
+        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
@@ -309,7 +312,7 @@ class PlayerLeaderboardV1(BaseModel):
     "/leaderboard",
     response_model_exclude_none=True,
     deprecated=True,
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_leaderboard(
     req: Request,
@@ -318,7 +321,7 @@ def get_leaderboard(
     limit: Annotated[int, Query(le=10000)] = 1000,
     account_id: int | None = None,
 ) -> list[PlayerLeaderboardV1]:
-    limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=10, period=1)])
+    limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     if account_id is not None:
         query = """
@@ -357,7 +360,7 @@ def get_leaderboard(
     "/leaderboard/{region}",
     response_model_exclude_none=True,
     deprecated=True,
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_leaderboard_by_region(
     req: Request,
@@ -367,7 +370,7 @@ def get_leaderboard_by_region(
     limit: Annotated[int, Query(le=10000)] = 1000,
 ) -> list[PlayerLeaderboardV1]:
     limiter.apply_limits(
-        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
@@ -403,7 +406,7 @@ class HeroLeaderboard(BaseModel):
 
 @router.get(
     "/hero-leaderboard/{hero_id}",
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_hero_leaderboard(
     req: Request,
@@ -414,7 +417,7 @@ def get_hero_leaderboard(
     limit: Annotated[int, Query(le=100)] = 100,
 ) -> list[HeroLeaderboard]:
     limiter.apply_limits(
-        req, res, "/v1/hero-leaderboard/{hero_id}", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/hero-leaderboard/{hero_id}", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
@@ -441,7 +444,7 @@ def get_hero_leaderboard(
     ]
 
 
-@router.get("/matches/by-account-id/{account_id}", summary="RateLimit: 10req/s")
+@router.get("/matches/by-account-id/{account_id}", summary="RateLimit: 100req/s")
 def get_matches_by_account_id(
     req: Request, res: Response, account_id: int
 ) -> list[dict]:
@@ -449,7 +452,7 @@ def get_matches_by_account_id(
         req,
         res,
         "/v1/matches/by-account-id/{account_id}",
-        [RateLimit(limit=10, period=1)],
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
@@ -544,15 +547,15 @@ def match_search(
 
 @router.get(
     "/matches/{match_id}/short",
-    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 1000req/min 10000req/hour, API-Key Ratelimit: 1000req/min",
 )
 def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     limiter.apply_limits(
         req,
         res,
         "/v1/matches/{match_id}/short",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-        [RateLimit(limit=100, period=10)],
+        [RateLimit(limit=1000, period=60), RateLimit(limit=10000, period=3600)],
+        [RateLimit(limit=1000, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -571,7 +574,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
 
 @router.get(
     "/matches/{match_id}/timestamps",
-    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
+    summary="RateLimit: 1000req/min 10000req/hour, API-Key Ratelimit: 1000req/min",
 )
 def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
     limiter.apply_limits(
@@ -579,7 +582,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
         res,
         "/v1/matches/{match_id}/timestamps",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-        [RateLimit(limit=100, period=60)],
+        [RateLimit(limit=1000, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -595,7 +598,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
 
 @router.get(
     "/matches/{match_id}/metadata",
-    summary="RateLimit: 100req/min",
+    summary="RateLimit: 100req/min 1000req/hour, API-Key RateLimit: 100req/min",
 )
 def get_match_metadata(
     req: Request,
@@ -606,6 +609,7 @@ def get_match_metadata(
         req,
         res,
         "/v1/matches/{match_id}/metadata",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
         [RateLimit(limit=100, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
