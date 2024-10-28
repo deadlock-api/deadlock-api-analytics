@@ -83,6 +83,12 @@ def post_match_salts(
 ) -> JSONResponse:
     response.headers["Cache-Control"] = "private, max-age=60"
     print(f"Authenticated with API key: {api_key}")
+    query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"match_id": match_salts.match_id})
+    if len(result) > 0:
+        for i in range(10):
+            print(f"Match {match_salts.match_id} already in match_salts")
     if match_salts.failed:
         query = "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
     else:
