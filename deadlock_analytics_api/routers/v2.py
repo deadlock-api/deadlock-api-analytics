@@ -312,6 +312,60 @@ def get_player_mmr_history(
     ]
 
 
+class PlayerHeroStat(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    hero_id: int
+    matches: int
+    wins: int
+    kills: int
+    deaths: int
+    assists: int
+    networth_per_min: float
+    damage_mitigated_per_min: float
+    damage_taken_per_min: float
+    creeps_per_min: float
+    denies_per_match: float
+    obj_damage_per_min: float
+    accuracy: float
+    crit_shot_rate: float
+
+
+@router.get(
+    "/players/{account_id}/hero-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_hero_stats(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+    hero_id: int | None = None,
+) -> list[PlayerHeroStat]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/{account_id}/hero-stats",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT *
+    FROM player_hero_stats
+    WHERE account_id = %(account_id)s
+    AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
+    """
+    with CH_POOL.get_client() as client:
+        result, keys = client.execute(
+            query,
+            {"account_id": account_id, "hero_id": hero_id},
+            with_column_types=True,
+        )
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return [PlayerHeroStat(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+
+
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
 def get_matches_by_account_id(
     req: Request, res: Response, account_id: int
