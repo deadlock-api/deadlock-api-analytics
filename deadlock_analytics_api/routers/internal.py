@@ -33,7 +33,7 @@ def get_recent_matches(
     ORDER BY match_id
     LIMIT %(limit)s
     """
-    batch_size = 1000
+    batch_size = 10000
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"limit": batch_size})
         if len(result) < batch_size:
