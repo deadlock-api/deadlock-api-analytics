@@ -11,10 +11,8 @@ router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 
 @router.get("/recent-matches")
 def get_recent_matches(
-    response: Response,
     api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> JSONResponse:
-    response.headers["Cache-Control"] = "private, max-age=60"
     print(f"Authenticated with API key: {api_key}")
     query = """
     SELECT DISTINCT match_id
