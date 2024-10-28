@@ -328,6 +328,25 @@ class PlayerHeroStat(BaseModel):
     obj_damage_per_min: float
     accuracy: float
     crit_shot_rate: float
+    highest_ranked_badge_level: int | None = None
+
+    @computed_field
+    @property
+    def highest_ranked_rank(self) -> int | None:
+        return (
+            self.highest_ranked_badge_level // 10
+            if self.highest_ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def highest_ranked_subrank(self) -> int | None:
+        return (
+            self.highest_ranked_badge_level % 10
+            if self.highest_ranked_badge_level is not None
+            else None
+        )
 
 
 @router.get(
