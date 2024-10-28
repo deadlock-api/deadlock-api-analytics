@@ -84,18 +84,19 @@ def post_match_salts(
     print(f"Received match_salts: {match_salts}")
     match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
     for match_salt in match_salts:
-        query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
-        with CH_POOL.get_client() as client:
-            result = client.execute(query, {"match_id": match_salt.match_id})
-        if len(result) > 0:
-            for i in range(10):
-                print(f"Match {match_salt.match_id} already in match_salts")
-        if match_salt.failed:
-            query = (
-                "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
-            )
-        else:
-            query = "INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt) VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s)"
-        with CH_POOL.get_client() as client:
-            client.execute(query, match_salt.model_dump())
-        return JSONResponse(content={"success": True})
+        try:
+            query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
+            with CH_POOL.get_client() as client:
+                result = client.execute(query, {"match_id": match_salt.match_id})
+            if len(result) > 0:
+                for i in range(10):
+                    print(f"Match {match_salt.match_id} already in match_salts")
+            if match_salt.failed:
+                query = "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
+            else:
+                query = "INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt) VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s)"
+            with CH_POOL.get_client() as client:
+                client.execute(query, match_salt.model_dump())
+        except Exception as e:
+            print(f"Failed to insert match_salt: {e}")
+    return JSONResponse(content={"success": True})
