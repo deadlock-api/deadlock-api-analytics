@@ -17,7 +17,7 @@ def get_recent_matches(
     query = """
     SELECT DISTINCT match_id
     FROM finished_matches
-    WHERE start_time < now() - INTERVAL '2 hours'
+    WHERE start_time < now() - INTERVAL '4 hours'
         AND start_time > now() - INTERVAL '7 days'
         AND match_id NOT IN (SELECT match_id FROM match_salts)
     ORDER BY start_time DESC
