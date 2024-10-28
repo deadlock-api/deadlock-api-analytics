@@ -127,24 +127,36 @@ def get_leaderboard_by_region(
 def get_hero_win_loss_stats(
     req: Request,
     res: Response,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
 ) -> list[HeroWinLossStat]:
     limiter.apply_limits(
         req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
-    SELECT hero_id, SUM(wins) AS total_wins, SUM(total) - SUM(wins) AS total_losses
-    FROM hero_player_winrate
-    INNER JOIN player_region USING (account_id)
-    WHERE %(region)s is NULL or region_mode = %(region)s
+    SELECT hero_id,
+            countIf(team == mi.winning_team) AS wins,
+            countIf(team != mi.winning_team) AS losses
+    FROM default.match_player
+    INNER JOIN match_info mi USING (match_id)
+    WHERE ranked_badge_level IS NULL OR (ranked_badge_level >= %(min_badge_level)s AND ranked_badge_level <= %(max_badge_level)s)
+    AND mi.start_time >= toDateTime(%(min_unix_timestamp)s) AND mi.start_time <= toDateTime(%(max_unix_timestamp)s)
     GROUP BY hero_id
-    ORDER BY total_wins + total_losses DESC;
+    ORDER BY wins + losses DESC;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"region": region})
+        result = client.execute(
+            query,
+            {
+                "min_badge_level": min_badge_level or 0,
+                "max_badge_level": max_badge_level or 116,
+                "min_unix_timestamp": min_unix_timestamp or 0,
+                "max_unix_timestamp": max_unix_timestamp or 4070908800,
+            },
+        )
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
