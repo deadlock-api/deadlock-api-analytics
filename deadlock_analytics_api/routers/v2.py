@@ -289,23 +289,9 @@ def get_player_mmr_history(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    WITH full_mmr_history AS (
-        SELECT match_id, ranked_badge_level, true as has_metadata
-        FROM match_player
-        WHERE account_id = 111200932
-
-        UNION DISTINCT
-
-        SELECT match_id, ranked_badge_level, false as has_metadata
-        FROM mmr_history
-        WHERE account_id = %(account_id)s AND match_id NOT IN (
-            SELECT match_id
-            FROM match_player
-            WHERE account_id = %(account_id)s
-        )
-    )
-    SELECT DISTINCT ON(match_id) match_id, ranked_badge_level, has_metadata
-    FROM full_mmr_history
+    SELECT match_id, ranked_badge_level, true as has_metadata
+    FROM match_player
+    WHERE account_id = %(account_id)s
     ORDER BY match_id DESC;
     """
     with CH_POOL.get_client() as client:
