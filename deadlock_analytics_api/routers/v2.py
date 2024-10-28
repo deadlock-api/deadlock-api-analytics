@@ -320,11 +320,13 @@ class PlayerHeroStat(BaseModel):
     kills: int
     deaths: int
     assists: int
+    ending_level: float
+    denies_per_match: float
     networth_per_min: float
     damage_mitigated_per_min: float
     damage_taken_per_min: float
     creeps_per_min: float
-    denies_per_match: float
+    denies_per_min: float
     obj_damage_per_min: float
     accuracy: float
     crit_shot_rate: float
