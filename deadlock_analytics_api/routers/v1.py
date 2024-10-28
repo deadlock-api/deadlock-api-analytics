@@ -112,7 +112,7 @@ def get_player_badge_level_distribution(
         SELECT ranked_badge_level
         FROM player_card
         WHERE ranked_badge_level > 0 AND (%(unix_timestamp)s IS NULL OR created_at <= toDateTime(%(unix_timestamp)s))
-        ORDER BY created_at
+        ORDER BY created_at DESC
         LIMIT 1 BY account_id
     )
     SELECT ranked_badge_level, COUNT(*) AS count
