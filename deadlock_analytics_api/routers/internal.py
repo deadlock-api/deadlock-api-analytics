@@ -83,6 +83,7 @@ def post_match_salts(
 ) -> JSONResponse:
     response.headers["Cache-Control"] = "private, max-age=60"
     print(f"Authenticated with API key: {api_key}")
+    print(f"Received match_salts: {match_salts}")
     query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"match_id": match_salts.match_id})
