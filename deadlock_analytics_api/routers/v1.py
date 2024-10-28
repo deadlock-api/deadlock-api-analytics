@@ -152,251 +152,6 @@ def get_match_region_distribution(
     return [RegionDistribution(region=row[0], count=row[1]) for row in result]
 
 
-class HeroWinLossStat(BaseModel):
-    hero_id: int
-    wins: int
-    losses: int
-
-
-@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s", deprecated=True)
-def get_hero_win_loss_stats(
-    req: Request,
-    res: Response,
-    min_match_score: Annotated[int | None, Query(ge=0)] = None,
-    max_match_score: Annotated[int | None, Query(le=3000)] = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
-) -> list[HeroWinLossStat]:
-    limiter.apply_limits(
-        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
-    )
-    if min_match_score is None:
-        min_match_score = 0
-    if max_match_score is None:
-        max_match_score = 3000
-    if min_unix_timestamp is None:
-        min_unix_timestamp = 0
-    if max_unix_timestamp is None:
-        max_unix_timestamp = 4070908800
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    query = """
-    SELECT `players.hero_id`                  as hero_id,
-            countIf(`players.team` == winner) AS wins,
-            countIf(`players.team` != winner) AS losses
-    FROM finished_matches
-        ARRAY JOIN players
-    WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
-    AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
-    GROUP BY `players.hero_id`
-    ORDER BY wins + losses DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {
-                "min_match_score": min_match_score,
-                "max_match_score": max_match_score,
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-            },
-        )
-    return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
-
-
-class PlayerMMRHistoryEntry(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    match_id: int
-    match_start_time: str
-    region_mode: str
-    player_score: int
-    match_ranked_badge_level: int | None = Field(None)
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-
-@router.get(
-    "/players/{account_id}/mmr-history",
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
-)
-def get_player_mmr_history(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> list[PlayerMMRHistoryEntry]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/players/{account_id}/mmr-history",
-        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
-        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
-    FROM mmr_history
-    WHERE account_id = %(account_id)s
-    ORDER BY match_id DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    match_ids = [r[1] for r in result]
-    query = """
-    SELECT match_id, start_time, region_mode
-    FROM active_matches
-    WHERE match_id IN %(match_ids)s
-    LIMIT 1 BY match_id;
-    """
-    with CH_POOL.get_client() as client:
-        result2 = client.execute(query, {"match_ids": match_ids})
-    match_id_start_time = {r[0]: (r[1], r[2]) for r in result2}
-    return [
-        PlayerMMRHistoryEntry(
-            account_id=r[0],
-            match_id=r[1],
-            match_start_time=match_id_start_time[r[1]][0].isoformat(),
-            region_mode=match_id_start_time[r[1]][1],
-            player_score=r[2],
-            match_ranked_badge_level=r[3],
-        )
-        for r in result
-    ]
-
-
-class PlayerLeaderboardV1(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    player_score: int
-    leaderboard_rank: int
-    matches_played: int | None = None
-    ranked_badge_level: int | None = None
-
-    @computed_field
-    @property
-    def ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
-
-
-@router.get(
-    "/leaderboard",
-    response_model_exclude_none=True,
-    deprecated=True,
-    summary="RateLimit: 100req/s",
-)
-def get_leaderboard(
-    req: Request,
-    res: Response,
-    start: Annotated[int, Query(ge=1)] = 1,
-    limit: Annotated[int, Query(le=10000)] = 1000,
-    account_id: int | None = None,
-) -> list[PlayerLeaderboardV1]:
-    limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=100, period=1)])
-    res.headers["Cache-Control"] = "public, max-age=300"
-    if account_id is not None:
-        query = """
-        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
-        FROM leaderboard_account
-        WHERE account_id = %(account_id)s
-        ORDER BY rank
-        LIMIT 1;
-        """
-    else:
-        query = """
-        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
-        FROM leaderboard
-        ORDER BY rank
-        LIMIT 1 by account_id
-        LIMIT %(limit)s
-        OFFSET %(start)s;
-        """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query, {"start": start - 1, "limit": limit, "account_id": account_id}
-        )
-    return [
-        PlayerLeaderboardV1(
-            account_id=r[0],
-            player_score=int(r[1]),
-            leaderboard_rank=r[2],
-            matches_played=r[3],
-            ranked_badge_level=r[4],
-        )
-        for r in result
-    ]
-
-
-@router.get(
-    "/leaderboard/{region}",
-    response_model_exclude_none=True,
-    deprecated=True,
-    summary="RateLimit: 100req/s",
-)
-def get_leaderboard_by_region(
-    req: Request,
-    res: Response,
-    region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
-    start: Annotated[int, Query(ge=1)] = 1,
-    limit: Annotated[int, Query(le=10000)] = 1000,
-) -> list[PlayerLeaderboardV1]:
-    limiter.apply_limits(
-        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=100, period=1)]
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, ranked_badge_level
-    FROM leaderboard
-    WHERE region_mode = %(region)s
-    ORDER BY rank
-    LIMIT %(limit)s
-    OFFSET %(start)s;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query, {"start": start - 1, "limit": limit, "region": region}
-        )
-    return [
-        PlayerLeaderboardV1(
-            account_id=r[0],
-            player_score=int(r[1]),
-            leaderboard_rank=r[2],
-            matches_played=r[3],
-            ranked_badge_level=r[4],
-        )
-        for r in result
-    ]
-
-
 class HeroLeaderboard(BaseModel):
     hero_id: int
     account_id: int
@@ -581,7 +336,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
         req,
         res,
         "/v1/matches/{match_id}/timestamps",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+        [RateLimit(limit=1000, period=60), RateLimit(limit=10000, period=3600)],
         [RateLimit(limit=1000, period=60)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
@@ -732,3 +487,249 @@ def get_all_finished_matches(
             ).encode()
 
     return StreamingResponse(stream())
+
+
+class HeroWinLossStat(BaseModel):
+    hero_id: int
+    wins: int
+    losses: int
+
+
+@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s", deprecated=True)
+def get_hero_win_loss_stats(
+    req: Request,
+    res: Response,
+    min_match_score: Annotated[int | None, Query(ge=0)] = None,
+    max_match_score: Annotated[int | None, Query(le=3000)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
+) -> list[HeroWinLossStat]:
+    limiter.apply_limits(
+        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
+    )
+    if min_match_score is None:
+        min_match_score = 0
+    if max_match_score is None:
+        max_match_score = 3000
+    if min_unix_timestamp is None:
+        min_unix_timestamp = 0
+    if max_unix_timestamp is None:
+        max_unix_timestamp = 4070908800
+    res.headers["Cache-Control"] = "public, max-age=1200"
+    query = """
+    SELECT `players.hero_id`                  as hero_id,
+            countIf(`players.team` == winner) AS wins,
+            countIf(`players.team` != winner) AS losses
+    FROM finished_matches
+        ARRAY JOIN players
+    WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
+    AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
+    GROUP BY `players.hero_id`
+    ORDER BY wins + losses DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "min_match_score": min_match_score,
+                "max_match_score": max_match_score,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+            },
+        )
+    return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+
+
+class PlayerLeaderboardV1(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    player_score: int
+    leaderboard_rank: int
+    matches_played: int | None = None
+    ranked_badge_level: int | None = None
+
+    @computed_field
+    @property
+    def ranked_rank(self) -> int | None:
+        return (
+            self.ranked_badge_level // 10
+            if self.ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def ranked_subrank(self) -> int | None:
+        return (
+            self.ranked_badge_level % 10
+            if self.ranked_badge_level is not None
+            else None
+        )
+
+
+@router.get(
+    "/leaderboard",
+    response_model_exclude_none=True,
+    deprecated=True,
+    summary="RateLimit: 100req/s",
+)
+def get_leaderboard(
+    req: Request,
+    res: Response,
+    start: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(le=10000)] = 1000,
+    account_id: int | None = None,
+) -> list[PlayerLeaderboardV1]:
+    limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=100, period=1)])
+    res.headers["Cache-Control"] = "public, max-age=300"
+    if account_id is not None:
+        query = """
+        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
+        FROM leaderboard_account
+        WHERE account_id = %(account_id)s
+        ORDER BY rank
+        LIMIT 1;
+        """
+    else:
+        query = """
+        SELECT account_id, player_score, rank, matches_played, ranked_badge_level
+        FROM leaderboard
+        ORDER BY rank
+        LIMIT 1 by account_id
+        LIMIT %(limit)s
+        OFFSET %(start)s;
+        """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query, {"start": start - 1, "limit": limit, "account_id": account_id}
+        )
+    return [
+        PlayerLeaderboardV1(
+            account_id=r[0],
+            player_score=int(r[1]),
+            leaderboard_rank=r[2],
+            matches_played=r[3],
+            ranked_badge_level=r[4],
+        )
+        for r in result
+    ]
+
+
+@router.get(
+    "/leaderboard/{region}",
+    response_model_exclude_none=True,
+    deprecated=True,
+    summary="RateLimit: 100req/s",
+)
+def get_leaderboard_by_region(
+    req: Request,
+    res: Response,
+    region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
+    start: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(le=10000)] = 1000,
+) -> list[PlayerLeaderboardV1]:
+    limiter.apply_limits(
+        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=100, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, ranked_badge_level
+    FROM leaderboard
+    WHERE region_mode = %(region)s
+    ORDER BY rank
+    LIMIT %(limit)s
+    OFFSET %(start)s;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query, {"start": start - 1, "limit": limit, "region": region}
+        )
+    return [
+        PlayerLeaderboardV1(
+            account_id=r[0],
+            player_score=int(r[1]),
+            leaderboard_rank=r[2],
+            matches_played=r[3],
+            ranked_badge_level=r[4],
+        )
+        for r in result
+    ]
+
+
+class PlayerMMRHistoryEntry(BaseModel):
+    account_id: int = Field(description="The account id of the player, it's a SteamID3")
+    match_id: int
+    match_start_time: str
+    region_mode: str
+    player_score: int
+    match_ranked_badge_level: int | None = Field(None)
+
+    @computed_field
+    @property
+    def match_ranked_rank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level // 10
+            if self.match_ranked_badge_level is not None
+            else None
+        )
+
+    @computed_field
+    @property
+    def match_ranked_subrank(self) -> int | None:
+        return (
+            self.match_ranked_badge_level % 10
+            if self.match_ranked_badge_level is not None
+            else None
+        )
+
+
+@router.get(
+    "/players/{account_id}/mmr-history",
+    deprecated=True,
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
+)
+def get_player_mmr_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerMMRHistoryEntry]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/players/{account_id}/mmr-history",
+        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
+        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
+    FROM mmr_history
+    WHERE account_id = %(account_id)s
+    ORDER BY match_id DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    match_ids = [r[1] for r in result]
+    query = """
+    SELECT match_id, start_time, region_mode
+    FROM active_matches
+    WHERE match_id IN %(match_ids)s
+    LIMIT 1 BY match_id;
+    """
+    with CH_POOL.get_client() as client:
+        result2 = client.execute(query, {"match_ids": match_ids})
+    match_id_start_time = {r[0]: (r[1], r[2]) for r in result2}
+    return [
+        PlayerMMRHistoryEntry(
+            account_id=r[0],
+            match_id=r[1],
+            match_start_time=match_id_start_time[r[1]][0].isoformat(),
+            region_mode=match_id_start_time[r[1]][1],
+            player_score=r[2],
+            match_ranked_badge_level=r[3],
+        )
+        for r in result
+    ]
