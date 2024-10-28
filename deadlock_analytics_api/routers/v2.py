@@ -248,7 +248,7 @@ class PlayerMMRHistoryEntryV2(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     match_id: int
     won: bool = Field(False)
-    has_metadata: bool = Field(False)
+    source: str
     match_ranked_badge_level: int | None = Field(None)
 
     @computed_field
@@ -290,7 +290,7 @@ def get_player_mmr_history(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT match_id, ranked_badge_level, team = mi.winning_team AS won, true as has_metadata
+    SELECT match_id, ranked_badge_level, team = mi.winning_team AS won, 'metadata' as source
     FROM match_player
     INNER JOIN match_info mi USING (match_id)
     WHERE account_id = %(account_id)s
@@ -306,7 +306,7 @@ def get_player_mmr_history(
             match_id=r[0],
             match_ranked_badge_level=r[1],
             won=r[2],
-            has_metadata=r[3],
+            source=r[3],
         )
         for r in result
     ]
