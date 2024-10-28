@@ -21,6 +21,7 @@ from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
 router = APIRouter(prefix="/v1", tags=["V1"])
+no_tagged_router = APIRouter(prefix="/v1")
 
 
 class MatchScoreDistribution(BaseModel):
@@ -199,33 +200,6 @@ def get_hero_leaderboard(
     ]
 
 
-@router.get("/matches/by-account-id/{account_id}", summary="RateLimit: 100req/s")
-def get_matches_by_account_id(
-    req: Request, res: Response, account_id: int
-) -> list[dict]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/by-account-id/{account_id}",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT match_id, start_time, ranked_badge_level
-    FROM finished_matches
-    ARRAY JOIN players
-    WHERE players.account_id = %(account_id)s
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Not found")
-    return [
-        {"match_id": r[0], "start_time": r[1].isoformat(), "ranked_badge_level": r[2]}
-        for r in result
-    ]
-
-
 @router.get(
     "/matches/search",
     summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
@@ -389,7 +363,7 @@ def get_match_metadata(
     return MatchMetadata.from_rows(match_info, match_players)
 
 
-@router.get(
+@no_tagged_router.get(
     "/matches/short",
     summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key with data access",
     tags=["Data API-Key required"],
@@ -487,6 +461,37 @@ def get_all_finished_matches(
             ).encode()
 
     return StreamingResponse(stream())
+
+
+@router.get(
+    "/matches/by-account-id/{account_id}",
+    deprecated=True,
+    summary="RateLimit: 100req/s",
+)
+def get_matches_by_account_id(
+    req: Request, res: Response, account_id: int
+) -> list[dict]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/by-account-id/{account_id}",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT match_id, start_time, ranked_badge_level
+    FROM finished_matches
+    ARRAY JOIN players
+    WHERE players.account_id = %(account_id)s
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return [
+        {"match_id": r[0], "start_time": r[1].isoformat(), "ranked_badge_level": r[2]}
+        for r in result
+    ]
 
 
 class HeroWinLossStat(BaseModel):

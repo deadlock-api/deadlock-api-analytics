@@ -46,6 +46,7 @@ Instrumentator(should_group_status_codes=False).instrument(app).expose(
 
 app.include_router(v2.router)
 app.include_router(v1.router)
+app.include_router(v1.no_tagged_router)
 app.include_router(internal.router)
 
 

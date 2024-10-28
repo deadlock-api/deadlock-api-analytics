@@ -310,3 +310,48 @@ def get_player_mmr_history(
         )
         for r in result
     ]
+
+
+@router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
+def get_matches_by_account_id(
+    req: Request, res: Response, account_id: int
+) -> list[dict]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/{account_id}/match-history",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    WITH matches as (
+        SELECT match_id, mi.start_time, ranked_badge_level, 'metadata' as source
+        FROM match_player
+        INNER JOIN match_info mi USING (match_id)
+        WHERE account_id = %(account_id)s
+
+        UNION ALL
+
+        SELECT match_id, start_time, ranked_badge_level, 'short' as source
+        FROM finished_matches
+        ARRAY JOIN players
+        WHERE players.account_id = %(account_id)s
+        AND match_id NOT IN (SELECT match_id FROM match_info)
+    )
+    SELECT *
+    FROM matches
+    ORDER BY match_id DESC
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_id": account_id})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return [
+        {
+            "match_id": r[0],
+            "start_time": r[1].isoformat(),
+            "ranked_badge_level": r[2],
+            "source": r[3],
+        }
+        for r in result
+    ]
