@@ -1,6 +1,6 @@
 import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MatchMetadataObjectives(BaseModel):
@@ -210,6 +210,9 @@ class MatchMetadata(BaseModel):
     source_name: list[str]
     objectives_mask_team0: int
     objectives_mask_team1: int
+    is_high_skill_range_parties: int | None = Field(None)
+    low_pri_pool: int | None = Field(None)
+    new_player_pool: int | None = Field(None)
     objectives: list[MatchMetadataObjectives]
     mid_boss: list[MatchMetadataMidBoss]
     players: list[MatchMetadataPlayer]
@@ -245,6 +248,9 @@ class MatchMetadata(BaseModel):
             source_name=match_info["source_name"],
             objectives_mask_team0=match_info["objectives_mask_team0"],
             objectives_mask_team1=match_info["objectives_mask_team1"],
+            is_high_skill_range_parties=match_info.get("is_high_skill_range_parties"),
+            low_pri_pool=match_info.get("low_pri_pool"),
+            new_player_pool=match_info.get("new_player_pool"),
             objectives=[MatchMetadataObjectives.from_dict(row) for row in objectives],
             mid_boss=[MatchMetadataMidBoss.from_dict(row) for row in mid_boss],
             players=[MatchMetadataPlayer.from_dict(row) for row in match_players],
