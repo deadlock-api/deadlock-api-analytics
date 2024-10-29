@@ -24,6 +24,43 @@ router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
 
 
+class TableSize(BaseModel):
+    rows: int
+    data_compressed_bytes: int
+    data_uncompressed_bytes: int
+
+
+class APIInfo(BaseModel):
+    table_sizes: dict[str, TableSize]
+
+
+@router.get("/info", summary="RateLimit: 100req/s")
+def get_api_info(req: Request, res: Response) -> APIInfo:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/info",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT table, SUM(rows) as rows, SUM(data_compressed_bytes) as data_compressed_bytes, SUM(data_uncompressed_bytes) as data_uncompressed_bytes
+    FROM system.parts
+    WHERE active AND database = 'default' AND table NOT LIKE 'system.%' AND table NOT LIKE '%inner%'
+    GROUP BY table
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query)
+    return APIInfo(
+        table_sizes={
+            r[0]: TableSize(
+                rows=r[1], data_compressed_bytes=r[2], data_uncompressed_bytes=r[3]
+            )
+            for r in result
+        }
+    )
+
+
 class MatchScoreDistribution(BaseModel):
     match_score: int
     count: int
