@@ -210,9 +210,9 @@ class MatchMetadata(BaseModel):
     source_name: list[str]
     objectives_mask_team0: int
     objectives_mask_team1: int
-    is_high_skill_range_parties: int | None = Field(None)
-    low_pri_pool: int | None = Field(None)
-    new_player_pool: int | None = Field(None)
+    is_high_skill_range_parties: bool | None = Field(None)
+    low_pri_pool: bool | None = Field(None)
+    new_player_pool: bool | None = Field(None)
     objectives: list[MatchMetadataObjectives]
     mid_boss: list[MatchMetadataMidBoss]
     players: list[MatchMetadataPlayer]
