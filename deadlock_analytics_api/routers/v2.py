@@ -145,6 +145,7 @@ def get_hero_win_loss_stats(
     WHERE ranked_badge_level IS NULL OR (ranked_badge_level >= %(min_badge_level)s AND ranked_badge_level <= %(max_badge_level)s)
     AND mi.start_time >= toDateTime(%(min_unix_timestamp)s) AND mi.start_time <= toDateTime(%(max_unix_timestamp)s)
     GROUP BY hero_id
+    HAVING wins + losses > 100
     ORDER BY wins + losses DESC;
     """
     with CH_POOL.get_client() as client:

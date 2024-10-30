@@ -578,6 +578,7 @@ def get_hero_win_loss_stats(
     WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
     GROUP BY `players.hero_id`
+    HAVING wins + losses > 100
     ORDER BY wins + losses DESC;
     """
     with CH_POOL.get_client() as client:
