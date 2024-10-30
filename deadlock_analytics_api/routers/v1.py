@@ -135,7 +135,10 @@ class PlayerBadgeLevelDistribution(BaseModel):
 
 @router.get("/player-badge-level-distribution", summary="RateLimit: 100req/s")
 def get_player_badge_level_distribution(
-    req: Request, res: Response, unix_timestamp: int | None = None
+    req: Request,
+    res: Response,
+    min_unix_timestamp: int | None = None,
+    max_unix_timestamp: int | None = None,
 ) -> list[PlayerBadgeLevelDistribution]:
     limiter.apply_limits(
         req,
@@ -148,7 +151,9 @@ def get_player_badge_level_distribution(
     WITH ranked_badge AS (
         SELECT ranked_badge_level
         FROM player_card
-        WHERE ranked_badge_level > 0 AND (%(unix_timestamp)s IS NULL OR created_at <= toDateTime(%(unix_timestamp)s))
+        WHERE ranked_badge_level > 0
+        AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
         ORDER BY created_at DESC
         LIMIT 1 BY account_id
     )
@@ -159,7 +164,13 @@ def get_player_badge_level_distribution(
     ORDER BY ranked_badge_level;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"unix_timestamp": unix_timestamp})
+        result = client.execute(
+            query,
+            {
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+            },
+        )
     return [
         PlayerBadgeLevelDistribution(player_badge_level=row[0], count=row[1])
         for row in result
