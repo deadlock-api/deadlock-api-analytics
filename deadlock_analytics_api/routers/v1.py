@@ -27,6 +27,7 @@ no_tagged_router = APIRouter(prefix="/v1")
 
 class TableSize(BaseModel):
     rows: int
+    is_view: bool
     data_compressed_bytes: int
     data_uncompressed_bytes: int
 
@@ -45,17 +46,27 @@ def get_api_info(req: Request, res: Response) -> APIInfo:
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT table, SUM(rows) as rows, SUM(data_compressed_bytes) as data_compressed_bytes, SUM(data_uncompressed_bytes) as data_uncompressed_bytes
-    FROM system.parts
-    WHERE active AND database = 'default' AND table NOT LIKE 'system.%' AND table NOT LIKE '%inner%'
-    GROUP BY table
+    SELECT
+        name                     AS table,
+        toBool(parts IS NULL)    AS is_view,
+        total_rows               AS rows,
+        total_bytes              AS data_compressed_bytes,
+        total_bytes_uncompressed AS data_uncompressed_bytes
+    FROM system.tables
+    WHERE database = 'default'
+        AND name NOT LIKE 'system.%'
+        AND name NOT LIKE '%inner%'
+    ORDER BY table;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
     return APIInfo(
         table_sizes={
             r[0]: TableSize(
-                rows=r[1], data_compressed_bytes=r[2], data_uncompressed_bytes=r[3]
+                is_view=r[1],
+                rows=r[2],
+                data_compressed_bytes=r[3],
+                data_uncompressed_bytes=r[4],
             )
             for r in result
         }
