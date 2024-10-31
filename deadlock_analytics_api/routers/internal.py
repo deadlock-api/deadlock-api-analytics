@@ -1,12 +1,13 @@
 import os
 
-from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL, s3_conn
 from fastapi import APIRouter, Depends
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, Response, StreamingResponse
+
+from deadlock_analytics_api import utils
+from deadlock_analytics_api.globs import CH_POOL, s3_conn
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 

@@ -2,6 +2,7 @@ import json
 import os
 
 import pika
+
 from deadlock_analytics_api.globs import CH_POOL
 
 RMQ_HOST = os.environ.get("RMQ_HOST", "154.53.45.225")

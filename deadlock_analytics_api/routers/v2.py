@@ -1,14 +1,15 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.rate_limiter import limiter
-from deadlock_analytics_api.rate_limiter.models import RateLimit
-from deadlock_analytics_api.routers.v1 import HeroWinLossStat
 from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field, computed_field
 from starlette.requests import Request
 from starlette.responses import Response
+
+from deadlock_analytics_api.globs import CH_POOL
+from deadlock_analytics_api.rate_limiter import limiter
+from deadlock_analytics_api.rate_limiter.models import RateLimit
+from deadlock_analytics_api.routers.v1 import HeroWinLossStat
 
 router = APIRouter(prefix="/v2", tags=["V2"])
 

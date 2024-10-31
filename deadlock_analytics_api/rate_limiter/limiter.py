@@ -2,12 +2,13 @@ import logging
 import time
 
 from cachetools.func import ttl_cache
-from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import ENFORCE_RATE_LIMITS, postgres_conn, redis_conn
-from deadlock_analytics_api.rate_limiter.models import RateLimit, RateLimitStatus
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
+
+from deadlock_analytics_api import utils
+from deadlock_analytics_api.globs import ENFORCE_RATE_LIMITS, postgres_conn, redis_conn
+from deadlock_analytics_api.rate_limiter.models import RateLimit, RateLimitStatus
 
 LOGGER = logging.getLogger(__name__)
 

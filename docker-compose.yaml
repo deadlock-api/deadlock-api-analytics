@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    restart: always
+    ports:
+    - "8080:8080"
+    env_file: .env
+    networks:
+    - database
+
+networks:
+  database:
+    external: true

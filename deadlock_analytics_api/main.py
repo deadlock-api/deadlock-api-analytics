@@ -1,12 +1,13 @@
 import logging
 import os
 
-from deadlock_analytics_api.routers import internal, v1, v2
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, RedirectResponse
+
+from deadlock_analytics_api.routers import internal, v1, v2
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
 

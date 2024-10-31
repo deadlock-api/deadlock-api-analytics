@@ -2,12 +2,13 @@ import logging
 import uuid
 
 from cachetools.func import ttl_cache
-from deadlock_analytics_api.globs import postgres_conn
 from fastapi import HTTPException, Security
 from fastapi.openapi.models import APIKey, APIKeyIn
 from fastapi.security.api_key import APIKeyBase
 from starlette.requests import Request
 from starlette.status import HTTP_403_FORBIDDEN
+
+from deadlock_analytics_api.globs import postgres_conn
 
 LOGGER = logging.getLogger(__name__)
 

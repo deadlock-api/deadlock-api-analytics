@@ -3,6 +3,13 @@ import os
 from typing import Annotated, Literal
 
 from clickhouse_driver import Client
+from fastapi import APIRouter, Depends, Path, Query
+from fastapi.openapi.models import APIKey
+from pydantic import BaseModel, Field, computed_field
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import Response, StreamingResponse
+
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.models.active_match import (
@@ -13,12 +20,6 @@ from deadlock_analytics_api.models.active_match import (
 from deadlock_analytics_api.models.match_metadata import MatchMetadata
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
-from fastapi import APIRouter, Depends, Path, Query
-from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field, computed_field
-from starlette.exceptions import HTTPException
-from starlette.requests import Request
-from starlette.responses import Response, StreamingResponse
 
 router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
