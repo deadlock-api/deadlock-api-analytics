@@ -40,7 +40,7 @@ def apply_limits(
         )
     if not limits:
         limits = ip_limits
-    status = [limit_by_key(f"{prefix}:{key}", l) for l in limits]
+    status = [limit_by_key(f"{prefix}:{key}:{l.period}", l) for l in limits]
     for s in status:
         LOGGER.info(
             f"count: {s.count}, "
