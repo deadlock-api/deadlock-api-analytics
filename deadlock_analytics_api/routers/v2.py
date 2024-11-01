@@ -236,7 +236,7 @@ def get_player_card_history(
     account_ids: Annotated[
         str,
         Query(
-            description="Comma separated account ids of the players, it's a SteamID3"
+            description="Comma separated account ids of the players, at most 100 allowed"
         ),
     ],
 ) -> list[list[PlayerCardHistoryEntry]]:
@@ -321,7 +321,7 @@ def get_player_mmr_history(
     account_ids: Annotated[
         str,
         Query(
-            description="Comma separated account ids of the players, it's a SteamID3"
+            description="Comma separated account ids of the players, at most 100 allowed"
         ),
     ],
 ) -> list[list[PlayerMMRHistoryEntryV2]]:
