@@ -234,9 +234,13 @@ def get_player_card_history(
     req: Request,
     res: Response,
     account_ids: Annotated[
-        list[int], Query(description="The account id of the player, it's a SteamID3")
+        str,
+        Query(
+            description="Comma separated account ids of the players, it's a SteamID3"
+        ),
     ],
 ) -> list[list[PlayerCardHistoryEntry]]:
+    account_ids = [int(a) for a in account_ids.split(",")]
     if len(account_ids) > 100:
         raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
 
@@ -315,9 +319,13 @@ def get_player_mmr_history(
     req: Request,
     res: Response,
     account_ids: Annotated[
-        list[int], Query(description="The account id of the player, it's a SteamID3")
+        str,
+        Query(
+            description="Comma separated account ids of the players, it's a SteamID3"
+        ),
     ],
 ) -> list[list[PlayerMMRHistoryEntryV2]]:
+    account_ids = [int(a) for a in account_ids.split(",")]
     if len(account_ids) > 100:
         raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
 
