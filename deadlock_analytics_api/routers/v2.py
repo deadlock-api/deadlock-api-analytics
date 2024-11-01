@@ -223,7 +223,7 @@ def get_player_card_history_single(
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> list[PlayerCardHistoryEntry]:
-    return get_player_card_history(req, res, account_ids=[account_id])[0]
+    return get_player_card_history(req, res, account_ids=str(account_id))[0]
 
 
 @router.get(
@@ -308,7 +308,7 @@ def get_player_mmr_history_single(
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> list[PlayerMMRHistoryEntryV2]:
-    return get_player_mmr_history(req, res, account_ids=[account_id])[0]
+    return get_player_mmr_history(req, res, account_ids=str(account_id))[0]
 
 
 @router.get(
