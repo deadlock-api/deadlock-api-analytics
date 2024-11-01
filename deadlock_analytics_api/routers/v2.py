@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime
 from typing import Annotated, Literal
 
@@ -215,35 +216,55 @@ class PlayerCardHistoryEntry(BaseModel):
     "/players/{account_id}/card-history",
     summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 10req/s",
 )
-def get_player_card_history(
+def get_player_card_history_single(
     req: Request,
     res: Response,
     account_id: Annotated[
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> list[PlayerCardHistoryEntry]:
+    return get_player_card_history(req, res, account_ids=[account_id])[0]
+
+
+@router.get(
+    "/players/card-history",
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 10req/s",
+)
+def get_player_card_history(
+    req: Request,
+    res: Response,
+    account_ids: Annotated[
+        list[int], Query(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[list[PlayerCardHistoryEntry]]:
+    if len(account_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
+
     limiter.apply_limits(
         req,
         res,
         "/v2/players/{account_id}/card-history",
         [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
         [RateLimit(limit=100, period=1)],
+        count=len(account_ids),
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT *
     FROM player_card
-    WHERE account_id = %(account_id)s
-    ORDER BY created_at DESC;
+    WHERE account_id IN %(account_ids)s
+    ORDER BY account_id, created_at DESC;
     """
     with CH_POOL.get_client() as client:
         result, keys = client.execute(
-            query, {"account_id": account_id}, with_column_types=True
+            query, {"account_ids": account_ids}, with_column_types=True
         )
     result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
-    return [PlayerCardHistoryEntry.from_row(r) for r in result]
+    cards = [PlayerCardHistoryEntry.from_row(r) for r in result]
+    cards_grouped = itertools.groupby(cards, key=lambda x: x.account_id)
+    return [list(cards) for account_id, cards in cards_grouped]
 
 
 class PlayerMMRHistoryEntryV2(BaseModel):
@@ -276,41 +297,62 @@ class PlayerMMRHistoryEntryV2(BaseModel):
     "/players/{account_id}/mmr-history",
     summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
 )
-def get_player_mmr_history(
+def get_player_mmr_history_single(
     req: Request,
     res: Response,
     account_id: Annotated[
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
 ) -> list[PlayerMMRHistoryEntryV2]:
+    return get_player_mmr_history(req, res, account_ids=[account_id])[0]
+
+
+@router.get(
+    "/players/mmr-history",
+    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
+)
+def get_player_mmr_history(
+    req: Request,
+    res: Response,
+    account_ids: Annotated[
+        list[int], Query(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[list[PlayerMMRHistoryEntryV2]]:
+    if len(account_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
+
     limiter.apply_limits(
         req,
         res,
         "/v2/players/{account_id}/mmr-history",
         [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
         [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
+        count=len(account_ids),
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT match_id, ranked_badge_level, team = mi.winning_team AS won, 'metadata' as source
     FROM match_player
     INNER JOIN match_info mi USING (match_id)
-    WHERE account_id = %(account_id)s
+    WHERE account_id IN %(account_ids)s
     ORDER BY match_id DESC;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
+        result = client.execute(query, {"account_ids": account_ids})
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     return [
-        PlayerMMRHistoryEntryV2(
-            account_id=account_id,
-            match_id=r[0],
-            match_ranked_badge_level=r[1],
-            won=r[2],
-            source=r[3],
-        )
-        for r in result
+        [
+            PlayerMMRHistoryEntryV2(
+                account_id=account_id,
+                match_id=r[0],
+                match_ranked_badge_level=r[1],
+                won=r[2],
+                source=r[3],
+            )
+            for r in result
+        ]
+        for account_id in account_ids
     ]
 
 

@@ -22,6 +22,7 @@ def apply_limits(
     ip_limits: list[RateLimit],
     key_default_limits: list[RateLimit] | None = None,
     global_limits: list[RateLimit] | None = None,
+    count: int = 1,
 ):
     ip = request.headers.get("CF-Connecting-IP", request.client.host)
     api_key = request.headers.get("X-API-Key", request.query_params.get("api_key"))
@@ -41,7 +42,7 @@ def apply_limits(
         )
     if not limits:
         limits = ip_limits
-    increment_key(f"{prefix}:{key}")
+    increment_key(f"{prefix}:{key}", count)
     status = [limit_by_key(f"{prefix}:{key}", l) for l in limits]
     if global_limits:
         status += [limit_by_key(key, l) for l in global_limits]
@@ -76,11 +77,13 @@ def get_extra_api_key_limits(api_key: str, path: str) -> list[RateLimit]:
         ]
 
 
-def increment_key(key: str):
-    current_time = float(time.time())
+def increment_key(key: str, count: int = 1):
+    # TODO: Save the count in redis, instead of creating many entries
     pipe = redis_conn().pipeline()
-    pipe.zremrangebyscore(key, 0, current_time - MAX_TTL_SECONDS)
-    pipe.zadd(key, {str(current_time): current_time})
+    pipe.zremrangebyscore(key, 0, float(time.time()) - MAX_TTL_SECONDS)
+    for _ in range(count):
+        current_time = float(time.time())
+        pipe.zadd(key, {str(current_time): current_time})
     pipe.expire(key, MAX_TTL_SECONDS)
     pipe.execute()
 
