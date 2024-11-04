@@ -1,13 +1,11 @@
-import os
-
 from fastapi import APIRouter, Depends
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
-from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.responses import JSONResponse, Response
 
 from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL, s3_conn
+from deadlock_analytics_api.globs import CH_POOL
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 
@@ -40,25 +38,6 @@ def get_recent_matches(
         if len(result) < batch_size:
             result += client.execute(query2, {"limit": batch_size - len(result)})
     return JSONResponse(content=[{"match_id": r[0]} for r in result])
-
-
-@router.get("/matches/{match_id}/raw_metadata")
-def get_raw_metadata_file(
-    match_id: int, api_key: APIKey = Depends(utils.get_internal_api_key)
-) -> StreamingResponse:
-    print(f"Authenticated with API key: {api_key}")
-    s3 = s3_conn()
-    bucket = os.environ.get("S3_BUCKET_NAME", "hexe")
-    key = f"processed/metadata/{match_id}.meta.bz2"
-    obj = s3.get_object(Bucket=bucket, Key=key)
-    return StreamingResponse(
-        obj["Body"],
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename={match_id}.meta.bz2",
-            "Cache-Control": "private, max-age=1200",
-        },
-    )
 
 
 class MatchSalts(BaseModel):

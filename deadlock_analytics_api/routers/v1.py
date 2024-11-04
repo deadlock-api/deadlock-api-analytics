@@ -11,7 +11,7 @@ from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
 
 from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL
+from deadlock_analytics_api.globs import CH_POOL, s3_conn
 from deadlock_analytics_api.models.active_match import (
     ACTIVE_MATCHES_KEYS,
     ACTIVE_MATCHES_REDUCED_KEYS,
@@ -421,6 +421,40 @@ def get_match_metadata(
     match_players = [{k: v for (k, _), v in zip(keys, row)} for row in match_players]
 
     return MatchMetadata.from_rows(match_info, match_players)
+
+
+@no_tagged_router.get(
+    "/matches/{match_id}/raw_metadata",
+    summary="RateLimit: 100req/min",
+    tags=["Data API-Key required"],
+)
+def get_raw_metadata_file(
+    req: Request,
+    res: Response,
+    match_id: int,
+    api_key: APIKey = Depends(utils.get_data_api_key),
+) -> StreamingResponse:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/{match_id}/metadata",
+        [RateLimit(limit=100, period=60)],
+        [RateLimit(limit=100, period=60)],
+        [RateLimit(limit=10, period=1)],
+    )
+    print(f"Authenticated with API key: {api_key}")
+    s3 = s3_conn()
+    bucket = os.environ.get("S3_BUCKET_NAME", "hexe")
+    key = f"processed/metadata/{match_id}.meta.bz2"
+    obj = s3.get_object(Bucket=bucket, Key=key)
+    return StreamingResponse(
+        obj["Body"],
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename={match_id}.meta.bz2",
+            "Cache-Control": "private, max-age=1200",
+        },
+    )
 
 
 @no_tagged_router.get(
