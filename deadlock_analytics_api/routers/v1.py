@@ -425,6 +425,17 @@ def get_match_metadata(
 
 @no_tagged_router.get(
     "/matches/{match_id}/raw_metadata",
+    description="""
+# Raw Metadata
+
+This endpoints streams the raw .meta.bz2 file for the given `match_id`.
+
+You have to decompress it and decode the protobuf message.
+
+Protobuf definitions can be found here: [https://github.com/SteamDatabase/Protobufs](https://github.com/SteamDatabase/Protobufs)
+
+At the moment the rate limits are quite strict, as we are serving it from an s3 with egress costs, but that may change.
+    """,
     summary="RateLimit: 100req/min",
     tags=["Data API-Key required"],
 )
