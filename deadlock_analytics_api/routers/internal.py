@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
-from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse, Response
 
 from deadlock_analytics_api import utils
@@ -46,32 +45,6 @@ class MatchSalts(BaseModel):
     metadata_salt: int | None = Field(None)
     replay_salt: int | None = Field(None)
     failed: bool | None = Field(None)
-
-
-@router.get("/match-salts")
-def get_match_salts(
-    response: Response, api_key: APIKey = Depends(utils.get_internal_api_key)
-) -> list[MatchSalts]:
-    response.headers["Cache-Control"] = "private, max-age=1200"
-    print(f"Authenticated with API key: {api_key}")
-    query = """
-    SELECT match_id, cluster_id, metadata_salt, replay_salt, failed
-    FROM match_salts
-    """
-    with CH_POOL.get_client() as client:
-        results = client.execute(query)
-    if len(results) == 0:
-        raise HTTPException(status_code=404, detail="Match not found")
-    return [
-        MatchSalts(
-            match_id=row[0],
-            cluster_id=row[1],
-            metadata_salt=row[2],
-            replay_salt=row[3],
-            failed=row[4],
-        )
-        for row in results
-    ]
 
 
 @router.post("/match-salts")
