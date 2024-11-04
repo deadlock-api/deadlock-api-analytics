@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, computed_field
 from starlette.requests import Request
 from starlette.responses import Response
 
+from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
@@ -54,6 +55,7 @@ def get_leaderboard(
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(req, res, "/v2/leaderboard", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     if account_id is not None:
         query = """
         SELECT account_id, region_mode, rank, ranked_badge_level
@@ -240,7 +242,7 @@ def get_player_card_history(
         ),
     ],
 ) -> list[list[PlayerCardHistoryEntry]]:
-    account_ids = [int(a) for a in account_ids.split(",")]
+    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
     if len(account_ids) > 100:
         raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
 
@@ -325,7 +327,7 @@ def get_player_mmr_history(
         ),
     ],
 ) -> list[list[PlayerMMRHistoryEntryV2]]:
-    account_ids = [int(a) for a in account_ids.split(",")]
+    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
     if len(account_ids) > 100:
         raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
 
@@ -422,6 +424,7 @@ def get_player_hero_stats(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     query = """
     SELECT *
     FROM player_hero_stats
@@ -450,6 +453,7 @@ def get_matches_by_account_id(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     query = """
     WITH matches as (
         SELECT match_id, mi.start_time, ranked_badge_level, 'metadata' as source

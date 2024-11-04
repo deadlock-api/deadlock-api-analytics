@@ -11,6 +11,7 @@ from starlette.status import HTTP_403_FORBIDDEN
 from deadlock_analytics_api.globs import postgres_conn
 
 LOGGER = logging.getLogger(__name__)
+STEAM_ID_64_IDENT = 76561197960265728
 
 
 class APIKeyHeaderOrQuery(APIKeyBase):
@@ -100,3 +101,17 @@ def is_valid_uuid(value: str) -> bool:
     except TypeError:
         LOGGER.warning(f"Invalid UUID: {value}")
         return False
+
+
+def validate_steam_id(steam_id: int | str) -> int:
+    try:
+        steam_id = int(steam_id)
+        if steam_id >= STEAM_ID_64_IDENT:
+            return steam_id - STEAM_ID_64_IDENT
+        return steam_id
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except TypeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

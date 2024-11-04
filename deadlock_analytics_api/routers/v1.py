@@ -583,6 +583,7 @@ def get_matches_by_account_id(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     query = """
     SELECT match_id, start_time, ranked_badge_level
     FROM finished_matches
@@ -692,6 +693,7 @@ def get_leaderboard(
 ) -> list[PlayerLeaderboardV1]:
     limiter.apply_limits(req, res, "/v1/leaderboard", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     if account_id is not None:
         query = """
         SELECT account_id, player_score, rank, matches_played, ranked_badge_level
@@ -813,6 +815,7 @@ def get_player_mmr_history(
         [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
+    account_id = utils.validate_steam_id(account_id)
     query = """
     SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
     FROM mmr_history
