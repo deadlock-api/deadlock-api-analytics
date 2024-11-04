@@ -152,6 +152,9 @@ def get_player_badge_level_distribution(
     res: Response,
     min_unix_timestamp: int | None = None,
     max_unix_timestamp: int | None = None,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
 ) -> list[PlayerBadgeLevelDistribution]:
     limiter.apply_limits(
         req,
@@ -164,7 +167,9 @@ def get_player_badge_level_distribution(
     WITH ranked_badge AS (
         SELECT ranked_badge_level
         FROM player_card
+        INNER JOIN player USING account_id
         WHERE ranked_badge_level > 0
+        AND (%(region)s IS NULL OR region_mode = %(region)s)
         AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
         ORDER BY created_at DESC
@@ -182,6 +187,7 @@ def get_player_badge_level_distribution(
             {
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
+                "region": region,
             },
         )
     return [
