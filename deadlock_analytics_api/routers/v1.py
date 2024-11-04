@@ -8,10 +8,11 @@ from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field, computed_field
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import Response, StreamingResponse
+from starlette.responses import RedirectResponse, Response, StreamingResponse
+from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL, s3_conn
+from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.models.active_match import (
     ACTIVE_MATCHES_KEYS,
     ACTIVE_MATCHES_REDUCED_KEYS,
@@ -423,48 +424,15 @@ def get_match_metadata(
     return MatchMetadata.from_rows(match_info, match_players)
 
 
-@no_tagged_router.get(
+@router.get(
     "/matches/{match_id}/raw_metadata",
-    description="""
-# Raw Metadata
-
-This endpoints streams the raw .meta.bz2 file for the given `match_id`.
-
-You have to decompress it and decode the protobuf message.
-
-Protobuf definitions can be found here: [https://github.com/SteamDatabase/Protobufs](https://github.com/SteamDatabase/Protobufs)
-
-At the moment the rate limits are quite strict, as we are serving it from an s3 with egress costs, but that may change.
-    """,
-    summary="RateLimit: 100req/min",
-    tags=["Data API-Key required"],
+    description="# Moved to Data API",
+    deprecated=True,
 )
-def get_raw_metadata_file(
-    req: Request,
-    res: Response,
-    match_id: int,
-    api_key: APIKey = Depends(utils.get_data_api_key),
-) -> StreamingResponse:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/{match_id}/metadata",
-        [RateLimit(limit=100, period=60)],
-        [RateLimit(limit=100, period=60)],
-        [RateLimit(limit=10, period=1)],
-    )
-    print(f"Authenticated with API key: {api_key}")
-    s3 = s3_conn()
-    bucket = os.environ.get("S3_BUCKET_NAME", "hexe")
-    key = f"processed/metadata/{match_id}.meta.bz2"
-    obj = s3.get_object(Bucket=bucket, Key=key)
-    return StreamingResponse(
-        obj["Body"],
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename={match_id}.meta.bz2",
-            "Cache-Control": "private, max-age=1200",
-        },
+def get_raw_metadata_file(match_id: int) -> RedirectResponse:
+    return RedirectResponse(
+        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/raw_metadata",
+        status_code=HTTP_301_MOVED_PERMANENTLY,
     )
 
 
