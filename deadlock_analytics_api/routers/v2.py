@@ -18,7 +18,9 @@ router = APIRouter(prefix="/v2", tags=["V2"])
 
 class PlayerLeaderboardV2(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    region_mode: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"]
+    region_mode: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = Field(None)
     leaderboard_rank: int
     ranked_badge_level: int | None = None
 

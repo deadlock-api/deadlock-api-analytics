@@ -740,7 +740,7 @@ class PlayerMMRHistoryEntry(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     match_id: int
     match_start_time: str
-    region_mode: str
+    region_mode: str | None = Field(None)
     player_score: int
     match_ranked_badge_level: int | None = Field(None)
 
