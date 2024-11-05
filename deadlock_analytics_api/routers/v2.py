@@ -73,9 +73,9 @@ def get_leaderboard(
         """
     else:
         order_by_clause = {
-            "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
-            "wins": "ORDER BY rank, wins DESC",
-            "matches": "ORDER BY rank, matches_played DESC",
+            "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
+            "wins": "ORDER BY rank, wins DESC, account_id",
+            "matches": "ORDER BY rank, matches_played DESC, account_id",
         }[sort_by or "winrate"]
         query = f"""
         SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
@@ -123,9 +123,9 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     order_by_clause = {
-        "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
-        "wins": "ORDER BY rank, wins DESC",
-        "matches": "ORDER BY rank, matches_played DESC",
+        "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
+        "wins": "ORDER BY rank, wins DESC, account_id",
+        "matches": "ORDER BY rank, matches_played DESC, account_id",
     }[sort_by or "winrate"]
     query = f"""
     SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
