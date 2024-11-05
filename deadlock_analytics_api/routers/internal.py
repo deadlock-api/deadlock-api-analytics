@@ -111,4 +111,4 @@ def get_matches_to_bundle(
     with postgres_conn().cursor() as cursor:
         cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
         bundled_match_ids = {r[0] for r in cursor.fetchall()}
-    return list(all_match_ids - bundled_match_ids)
+    return sorted(list(all_match_ids - bundled_match_ids))
