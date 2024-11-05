@@ -5,6 +5,8 @@ services:
     ports:
     - "8080:8080"
     env_file: .env
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
     networks:
     - database
 
