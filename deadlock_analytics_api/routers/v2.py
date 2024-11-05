@@ -137,6 +137,7 @@ def get_hero_win_loss_stats(
     max_badge_level: Annotated[int | None, Query(le=116)] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[HeroWinLossStat]:
     limiter.apply_limits(
         req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
@@ -150,6 +151,7 @@ def get_hero_win_loss_stats(
     INNER JOIN match_info mi USING (match_id)
     WHERE ranked_badge_level IS NULL OR (ranked_badge_level >= %(min_badge_level)s AND ranked_badge_level <= %(max_badge_level)s)
     AND mi.start_time >= toDateTime(%(min_unix_timestamp)s) AND mi.start_time <= toDateTime(%(max_unix_timestamp)s)
+    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
     GROUP BY hero_id
     HAVING wins + losses > 100
     ORDER BY wins + losses DESC;
@@ -162,6 +164,7 @@ def get_hero_win_loss_stats(
                 "max_badge_level": max_badge_level or 116,
                 "min_unix_timestamp": min_unix_timestamp or 0,
                 "max_unix_timestamp": max_unix_timestamp or 4070908800,
+                "match_mode": match_mode,
             },
         )
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
