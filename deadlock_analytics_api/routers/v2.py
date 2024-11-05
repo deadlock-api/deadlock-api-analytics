@@ -58,6 +58,7 @@ def get_leaderboard(
     res: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
+    sort_by: Literal["winrate", "wins", "matches"] | None = None,
     account_id: int | None = None,
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(req, res, "/v2/leaderboard", [RateLimit(limit=100, period=1)])
@@ -71,10 +72,16 @@ def get_leaderboard(
         LIMIT 1;
         """
     else:
-        query = """
+        # TODO: We trust Pydantic Validation to prevent SQL Injection
+        order_by_clause = {
+            "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
+            "wins": "ORDER BY rank, wins DESC",
+            "matches": "ORDER BY rank, matches_played DESC",
+        }[sort_by or "winrate"]
+        query = f"""
         SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
         FROM leaderboard_v2
-        ORDER BY rank, wins / greatest(1, matches_played) DESC
+        {order_by_clause}
         LIMIT 1 by account_id
         LIMIT %(limit)s
         OFFSET %(start)s;
@@ -110,16 +117,23 @@ def get_leaderboard_by_region(
     region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
+    sort_by: Literal["winrate", "wins", "matches"] | None = None,
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(
         req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
+    # TODO: We trust Pydantic Validation to prevent SQL Injection
+    order_by_clause = {
+        "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
+        "wins": "ORDER BY rank, wins DESC",
+        "matches": "ORDER BY rank, matches_played DESC",
+    }[sort_by or "winrate"]
+    query = f"""
     SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
     FROM leaderboard_v2
     WHERE region_mode = %(region)s
-    ORDER BY rank, wins / greatest(1, matches_played) DESC
+    {order_by_clause}
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
