@@ -421,6 +421,9 @@ def get_player_hero_stats(
         int, Path(description="The account id of the player, it's a SteamID3")
     ],
     hero_id: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[PlayerHeroStat]:
     limiter.apply_limits(
         req,
@@ -431,20 +434,54 @@ def get_player_hero_stats(
     res.headers["Cache-Control"] = "public, max-age=300"
     account_id = utils.validate_steam_id(account_id)
     query = """
-    SELECT *
-    FROM player_hero_stats
-    WHERE account_id = %(account_id)s
-    AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
+        SELECT hero_id,
+            count(*)                                                                                   AS matches,
+            max(ranked_badge_level)                                                                    AS highest_ranked_badge_level,
+            sum(team = mi.winning_team)                                                                AS wins,
+            sum(kills)                                                                                 AS kills,
+            sum(deaths)                                                                                AS deaths,
+            sum(assists)                                                                               AS assists,
+            avg(arrayMax(stats.level))                                                                 AS ending_level,
+            avg(denies)                                                                                AS denies_per_match,
+            60 * avg(net_worth / duration_s)                                                           AS networth_per_min,
+            60 * avg(last_hits / duration_s)                                                           AS last_hits_per_min,
+            60 * avg(denies / duration_s)                                                              AS denies_per_min,
+            60 * avg(arrayMax(stats.player_damage) / duration_s)                                       AS damage_mitigated_per_min,
+            60 * avg(arrayMax(stats.player_damage_taken) / duration_s)                                 AS damage_taken_per_min,
+            60 * avg(arrayMax(stats.creep_kills) / duration_s)                                         AS creeps_per_min,
+            60 * avg(arrayMax(stats.neutral_damage) / duration_s)                                      AS obj_damage_per_min,
+            avg(arrayMax(stats.shots_hit) / greatest(1, arrayMax(stats.shots_hit) + arrayMax(stats.shots_missed))) AS accuracy,
+            avg(arrayMax(stats.hero_bullets_hit_crit) / greatest(1, arrayMax(stats.hero_bullets_hit_crit) + arrayMax(stats.hero_bullets_hit))) AS crit_shot_rate
+        FROM default.match_player
+        INNER JOIN default.match_info AS mi USING (match_id)
+        WHERE account_id = %(account_id)s
+        AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
+        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+        GROUP BY hero_id
     """
     with CH_POOL.get_client() as client:
         result, keys = client.execute(
             query,
-            {"account_id": account_id, "hero_id": hero_id},
+            {
+                "account_id": account_id,
+                "hero_id": hero_id,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "match_mode": match_mode,
+            },
             with_column_types=True,
         )
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
-    return [PlayerHeroStat(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+    return [
+        PlayerHeroStat(
+            account_id=account_id,
+            **{k: v for (k, _), v in zip(keys, r)},
+        )
+        for r in result
+    ]
 
 
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
