@@ -22,6 +22,11 @@ class PlayerLeaderboardV2(BaseModel):
         Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
     ) = Field(None)
     leaderboard_rank: int
+    wins: int
+    matches_played: int
+    kills: int
+    deaths: int
+    assists: int
     ranked_badge_level: int | None = None
 
     @computed_field
@@ -60,17 +65,16 @@ def get_leaderboard(
     account_id = utils.validate_steam_id(account_id)
     if account_id is not None:
         query = """
-        SELECT account_id, region_mode, rank, ranked_badge_level
+        SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
         FROM leaderboard_account_v2
         WHERE account_id = %(account_id)s
-        ORDER BY rank
         LIMIT 1;
         """
     else:
         query = """
-        SELECT account_id, region_mode, rank, ranked_badge_level
+        SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
         FROM leaderboard_v2
-        ORDER BY rank
+        ORDER BY rank, wins / greatest(1, matches_played) DESC
         LIMIT 1 by account_id
         LIMIT %(limit)s
         OFFSET %(start)s;
@@ -85,6 +89,11 @@ def get_leaderboard(
             region_mode=r[1],
             leaderboard_rank=r[2],
             ranked_badge_level=r[3],
+            wins=r[4],
+            matches_played=r[5],
+            kills=r[6],
+            deaths=r[7],
+            assists=r[8],
         )
         for r in result
     ]
@@ -107,10 +116,10 @@ def get_leaderboard_by_region(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level
+    SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
     FROM leaderboard_v2
     WHERE region_mode = %(region)s
-    ORDER BY rank
+    ORDER BY rank, wins / greatest(1, matches_played) DESC
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
@@ -124,6 +133,11 @@ def get_leaderboard_by_region(
             region_mode=r[1],
             leaderboard_rank=r[2],
             ranked_badge_level=r[3],
+            wins=r[4],
+            matches_played=r[5],
+            kills=r[6],
+            deaths=r[7],
+            assists=r[8],
         )
         for r in result
     ]
