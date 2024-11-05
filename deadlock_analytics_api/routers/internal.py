@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 
 from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL
+from deadlock_analytics_api.globs import CH_POOL, postgres_conn
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 
@@ -49,11 +51,9 @@ class MatchSalts(BaseModel):
 
 @router.post("/match-salts")
 def post_match_salts(
-    response: Response,
     match_salts: list[MatchSalts] | MatchSalts,
     api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> JSONResponse:
-    response.headers["Cache-Control"] = "private, max-age=60"
     print(f"Authenticated with API key: {api_key}")
     print(f"Received match_salts: {match_salts}")
     match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
@@ -74,3 +74,41 @@ def post_match_salts(
         except Exception as e:
             print(f"Failed to insert match_salt: {e}")
     return JSONResponse(content={"success": True})
+
+
+class Bundle(BaseModel):
+    path: str
+    manifest_path: str
+    match_ids: list[int]
+    created_at: datetime | None = Field(None)
+
+
+@router.post("/bundles")
+def post_bundle(
+    bundle: Bundle, api_key: APIKey = Depends(utils.get_internal_api_key)
+) -> JSONResponse:
+    print(f"Authenticated with API key: {api_key}")
+    with postgres_conn().cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO match_bundle (match_ids, path, manifest_path, created_at)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (bundle.match_ids, bundle.path, bundle.manifest_path, bundle.created_at),
+        )
+        cursor.execute("COMMIT")
+    return JSONResponse(content={"success": True})
+
+
+@router.get("/matches-to-bundle")
+def get_matches_to_bundle(
+    api_key: APIKey = Depends(utils.get_internal_api_key),
+) -> list[int]:
+    print(f"Authenticated with API key: {api_key}")
+    with CH_POOL.get_client() as client:
+        all_match_ids = client.execute("SELECT DISTINCT match_id FROM match_info")
+    all_match_ids = {r[0] for r in all_match_ids}
+    with postgres_conn().cursor() as cursor:
+        cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
+        bundled_match_ids = {r[0] for r in cursor.fetchall()}
+    return list(all_match_ids - bundled_match_ids)
