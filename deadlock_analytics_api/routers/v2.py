@@ -72,7 +72,6 @@ def get_leaderboard(
         LIMIT 1;
         """
     else:
-        # TODO: We trust Pydantic Validation to prevent SQL Injection
         order_by_clause = {
             "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
             "wins": "ORDER BY rank, wins DESC",
@@ -123,7 +122,6 @@ def get_leaderboard_by_region(
         req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=300"
-    # TODO: We trust Pydantic Validation to prevent SQL Injection
     order_by_clause = {
         "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC",
         "wins": "ORDER BY rank, wins DESC",
