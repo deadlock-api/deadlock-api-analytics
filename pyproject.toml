@@ -23,7 +23,7 @@ black = "^24.10.0"
 
 
 [tool.poetry.group.mmr.dependencies]
-tqdm = "^4.66.6"
+tqdm = "^4.67.0"
 
 [build-system]
 requires = ["poetry-core"]
