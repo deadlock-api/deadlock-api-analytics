@@ -566,6 +566,65 @@ def get_player_mates(
     return [PlayerMate(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
 
 
+class PlayerParty(BaseModel):
+    party_size: int
+    wins: int
+    matches_played: int
+    matches: list[int]
+
+
+@router.get(
+    "/players/{account_id}/parties",
+    summary="RateLimit: 10req/s",
+)
+def get_player_parties(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> list[PlayerParty]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/{account_id}/parties",
+        [RateLimit(limit=10, period=1)],
+    )
+    account_id = utils.validate_steam_id(account_id)
+    query = """
+    SELECT
+    length(p.account_ids)              as party_size,
+    countIf(p.team == mi.winning_team) as wins,
+    COUNT()                            as matches_played,
+    groupArray(p.match_id)             as matches
+    FROM match_parties p
+    INNER JOIN match_info mi USING (match_id)
+    WHERE has(p.account_ids, %(account_id)s)
+    AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+    GROUP BY party_size
+    ORDER BY matches_played DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result, keys = client.execute(
+            query,
+            {
+                "account_id": account_id,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "match_mode": match_mode,
+            },
+            with_column_types=True,
+        )
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return [PlayerParty(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+
+
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
 def get_matches_by_account_id(
     req: Request, res: Response, account_id: int
