@@ -279,7 +279,7 @@ def get_player_card_history_single(
 
 @router.get(
     "/players/card-history",
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_player_card_history(
     req: Request,
@@ -299,7 +299,6 @@ def get_player_card_history(
         req,
         res,
         "/v2/players/{account_id}/card-history",
-        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
         [RateLimit(limit=100, period=1)],
         count=len(account_ids),
     )
@@ -364,7 +363,7 @@ def get_player_mmr_history_single(
 
 @router.get(
     "/players/mmr-history",
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
+    summary="RateLimit: 100req/s",
 )
 def get_player_mmr_history(
     req: Request,
@@ -384,8 +383,7 @@ def get_player_mmr_history(
         req,
         res,
         "/v2/players/{account_id}/mmr-history",
-        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
-        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
+        [RateLimit(limit=100, period=1)],
         count=len(account_ids),
     )
     res.headers["Cache-Control"] = "public, max-age=300"

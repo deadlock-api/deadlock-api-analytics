@@ -79,12 +79,12 @@ class MatchScoreDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-score-distribution", summary="RateLimit: 10req/s")
+@router.get("/match-score-distribution", summary="RateLimit: 100req/s")
 def get_match_score_distribution(
     req: Request, res: Response
 ) -> list[MatchScoreDistribution]:
     limiter.apply_limits(
-        req, res, "/v1/match-score-distribution", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
@@ -118,12 +118,12 @@ class MatchBadgeLevelDistribution(BaseModel):
         )
 
 
-@router.get("/match-badge-level-distribution", summary="RateLimit: 10req/s")
+@router.get("/match-badge-level-distribution", summary="RateLimit: 100req/s")
 def get_match_badge_level_distribution(
     req: Request, res: Response
 ) -> list[MatchBadgeLevelDistribution]:
     limiter.apply_limits(
-        req, res, "/v1/match-score-distribution", [RateLimit(limit=10, period=1)]
+        req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)]
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
@@ -343,15 +343,14 @@ def match_search(
 
 @router.get(
     "/matches/{match_id}/short",
-    summary="RateLimit: 1000req/min 10000req/hour, API-Key RateLimit: 1000req/min",
+    summary="RateLimit: 100req/s",
 )
 def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     limiter.apply_limits(
         req,
         res,
         "/v1/matches/{match_id}/short",
-        [RateLimit(limit=1000, period=60), RateLimit(limit=10000, period=3600)],
-        [RateLimit(limit=1000, period=60)],
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -370,15 +369,14 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
 
 @router.get(
     "/matches/{match_id}/timestamps",
-    summary="RateLimit: 1000req/min 10000req/hour, API-Key RateLimit: 1000req/min",
+    summary="RateLimit: 100req/s",
 )
 def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
     limiter.apply_limits(
         req,
         res,
         "/v1/matches/{match_id}/timestamps",
-        [RateLimit(limit=1000, period=60), RateLimit(limit=10000, period=3600)],
-        [RateLimit(limit=1000, period=60)],
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
@@ -394,7 +392,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
 
 @router.get(
     "/matches/{match_id}/metadata",
-    summary="RateLimit: 100req/min 1000req/hour, API-Key RateLimit: 1000req/min",
+    summary="RateLimit: 100req/min 1000req/hour, API-Key RateLimit: 100req/s",
 )
 def get_match_metadata(
     req: Request,
@@ -406,7 +404,7 @@ def get_match_metadata(
         res,
         "/v1/matches/{match_id}/metadata",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-        [RateLimit(limit=1000, period=60)],
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = "SELECT * FROM match_info WHERE match_id = %(match_id)s LIMIT 1"
@@ -772,7 +770,7 @@ class PlayerMMRHistoryEntry(BaseModel):
 @router.get(
     "/players/{account_id}/mmr-history",
     deprecated=True,
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
+    summary="RateLimit: 100req/s",
 )
 def get_player_mmr_history(
     req: Request,
@@ -785,8 +783,7 @@ def get_player_mmr_history(
         req,
         res,
         "/v1/players/{account_id}/mmr-history",
-        [RateLimit(limit=10, period=1), RateLimit(limit=1000, period=600)],
-        [RateLimit(limit=100, period=1), RateLimit(limit=10000, period=600)],
+        [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     account_id = utils.validate_steam_id(account_id)
