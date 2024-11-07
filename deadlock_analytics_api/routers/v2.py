@@ -519,7 +519,7 @@ class PlayerMate(BaseModel):
 
 @router.get(
     "/players/{account_id}/mates",
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_player_mates(
     req: Request,
@@ -535,7 +535,7 @@ def get_player_mates(
         req,
         res,
         "/v2/players/{account_id}/mates",
-        [RateLimit(limit=10, period=1)],
+        [RateLimit(limit=100, period=1)],
     )
     account_id = utils.validate_steam_id(account_id)
     query = """
@@ -575,7 +575,7 @@ class PlayerParty(BaseModel):
 
 @router.get(
     "/players/{account_id}/parties",
-    summary="RateLimit: 10req/s",
+    summary="RateLimit: 100req/s",
 )
 def get_player_parties(
     req: Request,
@@ -591,7 +591,7 @@ def get_player_parties(
         req,
         res,
         "/v2/players/{account_id}/parties",
-        [RateLimit(limit=10, period=1)],
+        [RateLimit(limit=100, period=1)],
     )
     account_id = utils.validate_steam_id(account_id)
     query = """
