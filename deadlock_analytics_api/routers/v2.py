@@ -539,17 +539,16 @@ def get_player_mates(
     )
     account_id = utils.validate_steam_id(account_id)
     query = """
-    SELECT mate.account_id as mate_id, countIf(p.team == mi.winning_team) as wins, COUNT() as matches_played, groupArray(p.match_id)  as matches
+    SELECT mate.account_id as mate_id, countIf(p.team == mi.winning_team) as wins, COUNT() as matches_played, groupArray(p.match_id) as matches
     FROM match_player p
-    INNER JOIN match_player mate ON p.match_id = mate.match_id AND p.team = mate.team
+    INNER JOIN match_player mate ON p.match_id = mate.match_id AND p.team = mate.team AND p.party = mate.party
     INNER JOIN match_info mi USING (match_id)
     WHERE p.account_id = %(account_id)s
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
     GROUP BY mate.account_id
-    HAVING COUNT() > 1
-    ORDER BY COUNT() DESC;
+    ORDER BY matches_played DESC;
     """
     with CH_POOL.get_client() as client:
         result, keys = client.execute(
