@@ -199,6 +199,7 @@ class MatchMetadata(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     match_id: int
+    region: str
     start_time: datetime.datetime
     winning_team: str
     duration_s: int
@@ -235,8 +236,12 @@ class MatchMetadata(BaseModel):
             if k.startswith("mid_boss.")
         }
         mid_boss = [dict(zip(mid_boss, t)) for t in zip(*mid_boss.values())]
+        region = next(
+            r.get("region_mode") for r in match_players if r.get("region_mode")
+        )
         return cls(
             match_id=match_info["match_id"],
+            region=region,
             start_time=match_info["start_time"],
             winning_team=match_info["winning_team"],
             duration_s=match_info["duration_s"],

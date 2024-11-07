@@ -418,7 +418,7 @@ def get_match_metadata(
         raise HTTPException(status_code=404, detail="Match not found")
     match_info = {k: v for (k, _), v in zip(keys, match_info[0])}
 
-    query = "SELECT * FROM match_player WHERE match_id = %(match_id)s LIMIT 12"
+    query = "SELECT *, p.region_mode as region_mode FROM match_player mp INNER JOIN player p USING (account_id) WHERE mp.match_id = %(match_id)s LIMIT 12"
     with CH_POOL.get_client() as client:
         match_players, keys = client.execute(
             query, {"match_id": match_id}, with_column_types=True
