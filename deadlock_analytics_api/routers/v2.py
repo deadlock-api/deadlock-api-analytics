@@ -467,16 +467,50 @@ def get_player_hero_stats(
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[PlayerHeroStat]:
+    return get_player_hero_stats_batch(
+        req,
+        res,
+        account_ids=str(account_id),
+        hero_id=hero_id,
+        min_unix_timestamp=min_unix_timestamp,
+        max_unix_timestamp=max_unix_timestamp,
+        match_mode=match_mode,
+    )[account_id]
+
+
+@router.get(
+    "/players/hero-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_hero_stats_batch(
+    req: Request,
+    res: Response,
+    account_ids: Annotated[
+        str,
+        Query(
+            description="Comma separated account ids of the players, at most 100 allowed"
+        ),
+    ],
+    hero_id: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> dict[int, list[PlayerHeroStat]]:
+    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
+    if len(account_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
     limiter.apply_limits(
         req,
         res,
         "/v2/players/{account_id}/hero-stats",
         [RateLimit(limit=100, period=1)],
+        count=len(account_ids),
     )
     res.headers["Cache-Control"] = "public, max-age=300"
-    account_id = utils.validate_steam_id(account_id)
     query = """
-        SELECT hero_id,
+        SELECT
+            account_id,
+            hero_id,
             count(*)                                                                                   AS matches,
             max(ranked_badge_level)                                                                    AS highest_ranked_badge_level,
             sum(team = mi.winning_team)                                                                AS wins,
@@ -496,18 +530,19 @@ def get_player_hero_stats(
             avg(arrayMax(stats.hero_bullets_hit_crit) / greatest(1, arrayMax(stats.hero_bullets_hit_crit) + arrayMax(stats.hero_bullets_hit))) AS crit_shot_rate
         FROM default.match_player
         INNER JOIN default.match_info AS mi USING (match_id)
-        WHERE account_id = %(account_id)s
+        WHERE account_id IN %(account_ids)s
         AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        GROUP BY hero_id
+        GROUP BY account_id, hero_id
+        ORDER BY account_id, hero_id;
     """
     with CH_POOL.get_client() as client:
         result, keys = client.execute(
             query,
             {
-                "account_id": account_id,
+                "account_ids": account_ids,
                 "hero_id": hero_id,
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
@@ -517,13 +552,13 @@ def get_player_hero_stats(
         )
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
-    return [
-        PlayerHeroStat(
-            account_id=account_id,
-            **{k: v for (k, _), v in zip(keys, r)},
+    return {
+        k: list(v)
+        for k, v in itertools.groupby(
+            (PlayerHeroStat(**{k: v for (k, _), v in zip(keys, r)}) for r in result),
+            key=lambda x: x.account_id,
         )
-        for r in result
-    ]
+    }
 
 
 class PlayerMate(BaseModel):
