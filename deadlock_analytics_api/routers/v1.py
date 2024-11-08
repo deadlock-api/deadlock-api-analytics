@@ -35,6 +35,7 @@ class TableSize(BaseModel):
 
 class APIInfo(BaseModel):
     table_sizes: dict[str, TableSize]
+    fetched_matches_per_day: int
 
 
 @router.get("/info", summary="RateLimit: 100req/s")
@@ -59,8 +60,14 @@ def get_api_info(req: Request, res: Response) -> APIInfo:
         AND name NOT LIKE '%inner%'
     ORDER BY table;
     """
+    query2 = """
+    SELECT COUNT() as fetched_matches_per_day
+    FROM match_salts
+    WHERE created_at > now() - INTERVAL 1 DAY;
+    """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
+        result2 = client.execute(query2)
     return APIInfo(
         table_sizes={
             r[0]: TableSize(
@@ -70,7 +77,8 @@ def get_api_info(req: Request, res: Response) -> APIInfo:
                 data_uncompressed_bytes=r[4],
             )
             for r in result
-        }
+        },
+        fetched_matches_per_day=result2[0][0],
     )
 
 
