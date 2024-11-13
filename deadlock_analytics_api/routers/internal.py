@@ -106,7 +106,9 @@ def get_matches_to_bundle(
 ) -> list[int]:
     print(f"Authenticated with API key: {api_key}")
     with CH_POOL.get_client() as client:
-        all_match_ids = client.execute("SELECT DISTINCT match_id FROM match_info")
+        all_match_ids = client.execute(
+            "SELECT DISTINCT match_id FROM match_info WHERE start_time < now() - INTERVAL 1 DAY"
+        )
     all_match_ids = {r[0] for r in all_match_ids}
     with postgres_conn().cursor() as cursor:
         cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
