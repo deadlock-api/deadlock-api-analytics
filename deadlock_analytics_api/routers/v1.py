@@ -18,7 +18,6 @@ from deadlock_analytics_api.models.active_match import (
     ACTIVE_MATCHES_REDUCED_KEYS,
     ActiveMatch,
 )
-from deadlock_analytics_api.models.match_metadata import MatchMetadata
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 
@@ -454,40 +453,14 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
 
 @router.get(
     "/matches/{match_id}/metadata",
-    summary="RateLimit: 100req/min 1000req/hour, API-Key RateLimit: 100req/s",
+    description="# Moved to Data API",
+    deprecated=True,
 )
-def get_match_metadata(
-    req: Request,
-    res: Response,
-    match_id: int,
-) -> MatchMetadata:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/{match_id}/metadata",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-        [RateLimit(limit=100, period=1)],
+def get_match_metadata(match_id: int) -> RedirectResponse:
+    return RedirectResponse(
+        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/metadata",
+        status_code=HTTP_301_MOVED_PERMANENTLY,
     )
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = "SELECT * FROM match_info WHERE match_id = %(match_id)s LIMIT 1"
-    with CH_POOL.get_client() as client:
-        match_info, keys = client.execute(
-            query, {"match_id": match_id}, with_column_types=True
-        )
-    if len(match_info) == 0:
-        raise HTTPException(status_code=404, detail="Match not found")
-    match_info = {k: v for (k, _), v in zip(keys, match_info[0])}
-
-    query = "SELECT *, p.region_mode as region_mode FROM match_player mp INNER JOIN player p USING (account_id) WHERE mp.match_id = %(match_id)s LIMIT 12"
-    with CH_POOL.get_client() as client:
-        match_players, keys = client.execute(
-            query, {"match_id": match_id}, with_column_types=True
-        )
-    if len(match_players) == 0:
-        raise HTTPException(status_code=404, detail="Match Players not found")
-    match_players = [{k: v for (k, _), v in zip(keys, row)} for row in match_players]
-
-    return MatchMetadata.from_rows(match_info, match_players)
 
 
 @router.get(
@@ -497,7 +470,7 @@ def get_match_metadata(
 )
 def get_raw_metadata_file(match_id: int) -> RedirectResponse:
     return RedirectResponse(
-        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/raw_metadata",
+        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/raw-metadata",
         status_code=HTTP_301_MOVED_PERMANENTLY,
     )
 
