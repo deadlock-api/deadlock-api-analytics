@@ -276,6 +276,55 @@ def get_hero_leaderboard(
 
 
 @router.get(
+    "/matches/search-ids",
+    summary="RateLimit: 100req/s",
+)
+def match_search_ids(
+    req: Request,
+    res: Response,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+) -> list[int]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/matches/search-ids",
+        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+    )
+    query = f"""
+    SELECT DISTINCT match_id FROM finished_matches
+    WHERE TRUE
+    AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+    ORDER BY match_id
+    UNION DISTINCT
+    SELECT DISTINCT match_id FROM player_match_history
+    WHERE TRUE
+    AND (%(min_unix_timestamp)s IS NULL OR start_time >= %(min_unix_timestamp)s)
+    AND (%(max_unix_timestamp)s IS NULL OR start_time <= %(max_unix_timestamp)s)
+    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+    AND match_mode IN ('Ranked', 'Unranked')
+    ORDER BY match_id
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+            },
+        )
+    return [r[0] for r in result]
+
+
+@router.get(
     "/matches/search",
     summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
 )
