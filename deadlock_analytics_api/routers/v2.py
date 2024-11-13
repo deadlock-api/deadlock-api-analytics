@@ -65,26 +65,22 @@ def get_leaderboard(
     res.headers["Cache-Control"] = "public, max-age=300"
     account_id = utils.validate_steam_id(account_id)
     if account_id is not None:
-        query = """
-        SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
-        FROM leaderboard_account_v2
-        WHERE account_id = %(account_id)s
-        LIMIT 1;
-        """
-    else:
-        order_by_clause = {
-            "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
-            "wins": "ORDER BY rank, wins DESC, account_id",
-            "matches": "ORDER BY rank, matches_played DESC, account_id",
-        }[sort_by or "winrate"]
-        query = f"""
-        SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
-        FROM leaderboard_v2
-        {order_by_clause}
-        LIMIT 1 by account_id
-        LIMIT %(limit)s
-        OFFSET %(start)s;
-        """
+        start = 1
+        limit = 1
+    order_by_clause = {
+        "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
+        "wins": "ORDER BY rank, wins DESC, account_id",
+        "matches": "ORDER BY rank, matches_played DESC, account_id",
+    }[sort_by or "winrate"]
+    query = f"""
+    SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
+    FROM leaderboard_v2
+    WHERE (%(account_id)s IS NULL OR account_id = %(account_id)s)
+    {order_by_clause}
+    LIMIT 1 by account_id
+    LIMIT %(limit)s
+    OFFSET %(start)s;
+    """
     with CH_POOL.get_client() as client:
         result = client.execute(
             query, {"start": start - 1, "limit": limit, "account_id": account_id}
