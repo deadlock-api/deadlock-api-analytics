@@ -290,6 +290,7 @@ def match_search_ids(
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
     max_match_id: int | None = None,
+    metadata_fetched: bool | None = None,
 ) -> list[MatchSearchIDs]:
     limiter.apply_limits(
         req,
@@ -297,24 +298,38 @@ def match_search_ids(
         "/v1/matches/search-ids",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
     )
-    query = f"""
-    SELECT DISTINCT match_id, start_time AS start_time FROM finished_matches
-    WHERE TRUE
-    AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-    AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-    ORDER BY match_id
-    UNION DISTINCT
-    SELECT DISTINCT match_id, toDateTime(start_time) AS start_time FROM player_match_history
-    WHERE TRUE
-    AND (%(min_unix_timestamp)s IS NULL OR start_time >= %(min_unix_timestamp)s)
-    AND (%(max_unix_timestamp)s IS NULL OR start_time <= %(max_unix_timestamp)s)
-    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-    AND match_mode IN ('Ranked', 'Unranked')
-    ORDER BY match_id
-    """
+    if metadata_fetched:
+        query = """
+        SELECT DISTINCT match_id, start_time AS start_time
+        FROM match_info
+        WHERE TRUE
+        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+        ORDER BY match_id
+        """
+    else:
+        query = """
+        SELECT DISTINCT match_id, start_time AS start_time
+        FROM finished_matches
+        WHERE TRUE
+        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+        ORDER BY match_id
+        UNION DISTINCT
+        SELECT DISTINCT match_id, toDateTime(start_time) AS start_time
+        FROM player_match_history
+        WHERE TRUE
+        AND (%(min_unix_timestamp)s IS NULL OR start_time >= %(min_unix_timestamp)s)
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= %(max_unix_timestamp)s)
+        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+        AND match_mode IN ('Ranked', 'Unranked')
+        ORDER BY match_id
+        """
     with CH_POOL.get_client() as client:
         result = client.execute(
             query,
