@@ -1,5 +1,5 @@
-import datetime
 import os
+from datetime import datetime
 from typing import Annotated, Literal
 
 from clickhouse_driver import Client
@@ -275,6 +275,11 @@ def get_hero_leaderboard(
     ]
 
 
+class MatchSearchIDs(BaseModel):
+    match_id: int
+    start_time: datetime
+
+
 @router.get(
     "/matches/search-ids",
     summary="RateLimit: 100req/s",
@@ -286,7 +291,7 @@ def match_search_ids(
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
     max_match_id: int | None = None,
-) -> list[int]:
+) -> list[MatchSearchIDs]:
     limiter.apply_limits(
         req,
         res,
@@ -294,7 +299,7 @@ def match_search_ids(
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
     )
     query = f"""
-    SELECT DISTINCT match_id FROM finished_matches
+    SELECT DISTINCT match_id, start_time AS start_time FROM finished_matches
     WHERE TRUE
     AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
@@ -302,7 +307,7 @@ def match_search_ids(
     AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
     ORDER BY match_id
     UNION DISTINCT
-    SELECT DISTINCT match_id FROM player_match_history
+    SELECT DISTINCT match_id, toDateTime(start_time) AS start_time FROM player_match_history
     WHERE TRUE
     AND (%(min_unix_timestamp)s IS NULL OR start_time >= %(min_unix_timestamp)s)
     AND (%(max_unix_timestamp)s IS NULL OR start_time <= %(max_unix_timestamp)s)
@@ -321,7 +326,7 @@ def match_search_ids(
                 "max_match_id": max_match_id,
             },
         )
-    return [r[0] for r in result]
+    return [MatchSearchIDs(match_id=r[0], start_time=r[1]) for r in result]
 
 
 @router.get(
@@ -588,7 +593,7 @@ def get_all_finished_matches(
                 continue
             yield (
                 ",".join(
-                    (str(c) if not isinstance(c, datetime.datetime) else c.isoformat())
+                    (str(c) if not isinstance(c, datetime) else c.isoformat())
                     for c in row
                 )
                 + "\n"
