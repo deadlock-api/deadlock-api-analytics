@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
@@ -102,13 +103,28 @@ def post_bundle(
 
 @router.get("/matches-to-bundle")
 def get_matches_to_bundle(
+    min_unix_timestamp: Annotated[int, Query(ge=0)],
+    max_unix_timestamp: int,
     api_key: APIKey = Depends(utils.get_internal_api_key),
     limit: int | None = None,
 ) -> list[int]:
     print(f"Authenticated with API key: {api_key}")
+    if max_unix_timestamp < min_unix_timestamp:
+        raise HTTPException(
+            status_code=400,
+            detail="max_unix_timestamp must be greater than or equal to min_unix_timestamp",
+        )
+    if max_unix_timestamp > (datetime.now() - timedelta(days=1)).timestamp():
+        raise HTTPException(
+            status_code=400, detail="max_unix_timestamp must be at least 24 hours ago"
+        )
     with CH_POOL.get_client() as client:
         all_match_ids = client.execute(
-            "SELECT DISTINCT match_id FROM match_info WHERE start_time < now() - INTERVAL 1 DAY"
+            "SELECT DISTINCT match_id FROM match_info WHERE start_time < now() - INTERVAL 1 DAY AND start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s) AND match_mode IN ('Ranked', 'Unranked') AND match_outcome = 'TeamWin'",
+            {
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+            },
         )
     all_match_ids = {r[0] for r in all_match_ids}
     with postgres_conn().cursor() as cursor:
