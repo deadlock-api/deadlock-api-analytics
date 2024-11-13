@@ -103,6 +103,7 @@ def post_bundle(
 @router.get("/matches-to-bundle")
 def get_matches_to_bundle(
     api_key: APIKey = Depends(utils.get_internal_api_key),
+    limit: int | None = None,
 ) -> list[int]:
     print(f"Authenticated with API key: {api_key}")
     with CH_POOL.get_client() as client:
@@ -113,4 +114,7 @@ def get_matches_to_bundle(
     with postgres_conn().cursor() as cursor:
         cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
         bundled_match_ids = {r[0] for r in cursor.fetchall()}
-    return sorted(list(all_match_ids - bundled_match_ids))
+    match_ids = sorted(list(all_match_ids - bundled_match_ids))
+    if limit:
+        match_ids = match_ids[:limit]
+    return match_ids
