@@ -177,8 +177,8 @@ def get_hero_win_loss_stats(
         INNER JOIN match_info mi USING (match_id)
         INNER JOIN player p USING (account_id)
         WHERE 1=1
-        AND (ranked_badge_level IS NULL OR %(min_badge_level)s IS NULL OR ranked_badge_level >= %(min_badge_level)s)
-        AND (ranked_badge_level IS NULL OR %(max_badge_level)s IS NULL OR ranked_badge_level <= %(max_badge_level)s)
+        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL OR ranked_badge_level >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL OR ranked_badge_level <= %(max_badge_level)s))
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
