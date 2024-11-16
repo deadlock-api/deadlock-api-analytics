@@ -48,6 +48,7 @@ class MatchSalts(BaseModel):
     metadata_salt: int | None = Field(None)
     replay_salt: int | None = Field(None)
     failed: bool | None = Field(None)
+    username: str | None = Field(None)
 
 
 @router.post("/match-salts")
@@ -69,7 +70,7 @@ def post_match_salts(
             if match_salt.failed:
                 query = "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
             else:
-                query = "INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt) VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s)"
+                query = "INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt, username) VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s, %(username)s)"
             with CH_POOL.get_client() as client:
                 client.execute(query, match_salt.model_dump())
         except Exception as e:
