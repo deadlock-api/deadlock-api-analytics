@@ -209,6 +209,89 @@ def get_hero_win_loss_stats(
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
+class ItemWinLossStat(BaseModel):
+    hero_id: int
+    item_id: int
+    wins: int
+    losses: int
+
+
+@router.get("/hero/{hero_id}/item-win-loss-stats", summary="RateLimit: 100req/s")
+def get_hero_item_win_loss_stats(
+    req: Request,
+    res: Response,
+    hero_id: int,
+    item_id: int | None = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_hero_matches_per_player: Annotated[int | None, Query(ge=0)] = None,
+    max_hero_matches_per_player: int = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
+) -> list[ItemWinLossStat]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/hero/{hero_id}/item-win-loss-stats",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
+    query = """
+    WITH filtered_players AS (
+        SELECT
+            hero_id,
+            items.item_id AS item_id,
+            account_id,
+            countIf(team == mi.winning_team) AS player_wins,
+            countIf(team != mi.winning_team) AS player_losses
+        FROM match_player
+        INNER JOIN match_info mi USING (match_id)
+        INNER JOIN player p USING (account_id)
+        ARRAY JOIN items
+        WHERE TRUE
+        AND %(hero_id)s = hero_id
+        AND (%(item_id)s IS NULL OR items.item_id = %(item_id)s)
+        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s))
+        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
+        GROUP BY hero_id, item_id, account_id
+    )
+    SELECT hero_id, item_id, sum(player_wins) AS wins, sum(player_losses) AS losses
+    FROM filtered_players
+    WHERE (%(min_hero_matches)s IS NULL OR player_wins + player_losses <= %(min_hero_matches)s)
+    AND (%(max_hero_matches)s IS NULL OR player_wins + player_losses <= %(max_hero_matches)s)
+    GROUP BY hero_id, item_id
+    ORDER BY wins + losses DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "hero_id": hero_id,
+                "item_id": item_id,
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "match_mode": match_mode,
+                "region": region,
+                "min_hero_matches": min_hero_matches_per_player,
+                "max_hero_matches": max_hero_matches_per_player,
+            },
+        )
+    return [
+        ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3])
+        for r in result
+    ]
+
+
 class PlayerCardSlot(BaseModel):
     slots_id: int
     hero_id: int
