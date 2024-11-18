@@ -182,7 +182,6 @@ def get_hero_win_loss_stats(
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
         AND (%(region)s IS NULL OR p.region_mode = %(region)s)
         GROUP BY hero_id, account_id
     )
