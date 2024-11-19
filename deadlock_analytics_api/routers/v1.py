@@ -277,6 +277,9 @@ def get_hero_leaderboard(
 class MatchSearchIDs(BaseModel):
     match_id: int
     start_time: datetime
+    duration_s: int
+    match_mode: str
+    game_mode: str
 
 
 @router.get(
@@ -290,7 +293,13 @@ def match_search_ids(
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
     max_match_id: int | None = None,
-    metadata_fetched: bool | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    is_high_skill_range_parties: bool | None = None,
+    is_low_pri_pool: bool | None = None,
+    is_new_player_pool: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=100000)] = 1000,
 ) -> list[MatchSearchIDs]:
     limiter.apply_limits(
         req,
@@ -298,38 +307,24 @@ def match_search_ids(
         "/v1/matches/search-ids",
         [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
     )
-    if metadata_fetched:
-        query = """
-        SELECT DISTINCT match_id, start_time AS start_time
-        FROM match_info
-        WHERE TRUE
-        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-        ORDER BY match_id
-        """
-    else:
-        query = """
-        SELECT DISTINCT match_id, start_time AS start_time
-        FROM finished_matches
-        WHERE TRUE
-        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-        ORDER BY match_id
-        UNION DISTINCT
-        SELECT DISTINCT match_id, toDateTime(start_time) AS start_time
-        FROM player_match_history
-        WHERE TRUE
-        AND (%(min_unix_timestamp)s IS NULL OR start_time >= %(min_unix_timestamp)s)
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= %(max_unix_timestamp)s)
-        AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-        AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-        AND match_mode IN ('Ranked', 'Unranked')
-        ORDER BY match_id
-        """
+    query = """
+    SELECT DISTINCT ON(match_id) match_id, start_time, duration_s, match_mode, game_mode
+    FROM match_info
+    WHERE TRUE
+    AND match_outcome = 'TeamWin'
+    AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+    AND (%(min_duration_s)s IS NULL OR duration_s >= %(min_duration_s)s)
+    AND (%(max_duration_s)s IS NULL OR duration_s <= %(max_duration_s)s)
+    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
+    AND (%(is_high_skill_range_party)s IS NULL OR is_high_skill_range_parties = %(is_high_skill_range_party)s)
+    AND (%(is_low_pri_pool)s IS NULL OR low_pri_pool = %(is_low_pri_pool)s)
+    AND (%(is_new_player_pool)s IS NULL OR new_player_pool = %(is_new_player_pool)s)
+    ORDER BY match_id
+    LIMIT %(limit)s
+    """
     with CH_POOL.get_client() as client:
         result = client.execute(
             query,
@@ -338,9 +333,25 @@ def match_search_ids(
                 "max_unix_timestamp": max_unix_timestamp,
                 "min_match_id": min_match_id,
                 "max_match_id": max_match_id,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+                "match_mode": match_mode,
+                "is_high_skill_range_party": is_high_skill_range_parties,
+                "is_low_pri_pool": is_low_pri_pool,
+                "is_new_player_pool": is_new_player_pool,
+                "limit": limit,
             },
         )
-    return [MatchSearchIDs(match_id=r[0], start_time=r[1]) for r in result]
+    return [
+        MatchSearchIDs(
+            match_id=r[0],
+            start_time=r[1],
+            duration_s=r[2],
+            match_mode=r[3],
+            game_mode=r[4],
+        )
+        for r in result
+    ]
 
 
 @router.get(
