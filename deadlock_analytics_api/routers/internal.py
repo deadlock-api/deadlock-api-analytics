@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
 from typing import Annotated
 
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
+from requests import Request
 from starlette.responses import JSONResponse
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL, postgres_conn
+from deadlock_analytics_api.utils import is_internal_api_key
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 
@@ -53,13 +56,24 @@ class MatchSalts(BaseModel):
 
 @router.post("/match-salts")
 def post_match_salts(
+    req: Request,
     match_salts: list[MatchSalts] | MatchSalts,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
+    api_key: str | None = None,
 ) -> JSONResponse:
+    api_key = api_key or req.headers.get("X-API-Key")
+    bypass_check = is_internal_api_key(api_key)
+
     print(f"Authenticated with API key: {api_key}")
     print(f"Received match_salts: {match_salts}")
     match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
     for match_salt in match_salts:
+        if not bypass_check:
+            url = f"http://replay{match_salt.cluster_id}.valve.net/1422450/{match_salt.match_id}_{match_salt.metadata_salt}.meta.bz2"
+            if requests.head(url).status_code != 200:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Metadata not found for match {match_salt.match_id}",
+                )
         try:
             query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
             with CH_POOL.get_client() as client:
