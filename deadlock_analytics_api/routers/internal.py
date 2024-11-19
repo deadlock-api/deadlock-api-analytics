@@ -5,7 +5,7 @@ import requests
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
-from requests import Request
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from deadlock_analytics_api import utils
