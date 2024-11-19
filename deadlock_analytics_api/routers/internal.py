@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL, postgres_conn
+from deadlock_analytics_api.rate_limiter import limiter
+from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.utils import is_internal_api_key
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
@@ -42,6 +44,32 @@ def get_recent_matches(
         result = client.execute(query, {"limit": batch_size})
         if len(result) < batch_size:
             result += client.execute(query2, {"limit": batch_size - len(result)})
+    return JSONResponse(content=[{"match_id": r[0]} for r in result])
+
+
+@router.get("/missing-matches")
+def get_missing_matches(
+    req: Request, res: Response, limit: Annotated[int, Query(ge=1, le=100)] = 100
+) -> JSONResponse:
+    limiter.apply_limits(
+        req, res, "/v1/missing-matches", [RateLimit(limit=100, period=1)]
+    )
+    query = """
+    WITH matches AS (
+        SELECT DISTINCT match_id, toUnixTimestamp(start_time) AS start_time FROM finished_matches
+        UNION DISTINCT
+        SELECT DISTINCT match_id, start_time FROM player_match_history
+        WHERE match_mode IN ('Ranked', 'Unranked')
+    )
+    SELECT DISTINCT match_id
+    FROM matches
+    WHERE start_time < now() - INTERVAL '3 hours' AND start_time > toDateTime('2024-11-01')
+    AND match_id NOT IN (SELECT match_id FROM match_salts UNION DISTINCT SELECT match_id FROM match_info)
+    ORDER BY rand()
+    LIMIT %(limit)s
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"limit": limit})
     return JSONResponse(content=[{"match_id": r[0]} for r in result])
 
 
