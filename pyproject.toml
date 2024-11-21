@@ -15,7 +15,7 @@ psycopg2-binary = "^2.9.10"
 uuid = "^1.30"
 cachetools = "^5.5.0"
 pika = "^1.3.2"
-sentry-sdk = { version = "^2.18.0", extras = ["fastapi"] }
+sentry-sdk = { version = "^2.19.0", extras = ["fastapi"] }
 granian = "^1.6.3"
 requests = "^2.32.3"
 

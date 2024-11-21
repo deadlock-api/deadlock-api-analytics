@@ -224,8 +224,6 @@ def get_hero_item_win_loss_stats(
     item_id: int | None = None,
     min_badge_level: Annotated[int | None, Query(ge=0)] = None,
     max_badge_level: Annotated[int | None, Query(le=116)] = None,
-    min_hero_matches_per_player: Annotated[int | None, Query(ge=0)] = None,
-    max_hero_matches_per_player: int = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
@@ -241,32 +239,24 @@ def get_hero_item_win_loss_stats(
     )
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
-    WITH filtered_players AS (
-        SELECT
-            hero_id,
-            items.item_id AS item_id,
-            account_id,
-            countIf(team == mi.winning_team) AS player_wins,
-            countIf(team != mi.winning_team) AS player_losses
-        FROM match_player
-        INNER JOIN match_info mi USING (match_id)
-        INNER JOIN player p USING (account_id)
-        ARRAY JOIN items
-        WHERE TRUE
-        AND %(hero_id)s = hero_id
-        AND (%(item_id)s IS NULL OR items.item_id = %(item_id)s)
-        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s))
-        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s))
-        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
-        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
-        GROUP BY hero_id, item_id, account_id
-    )
-    SELECT hero_id, item_id, sum(player_wins) AS wins, sum(player_losses) AS losses
-    FROM filtered_players
-    WHERE (%(min_hero_matches)s IS NULL OR player_wins + player_losses <= %(min_hero_matches)s)
-    AND (%(max_hero_matches)s IS NULL OR player_wins + player_losses <= %(max_hero_matches)s)
+    SELECT
+        hero_id,
+        items.item_id AS item_id,
+        countIf(won) AS wins,
+        countIf(NOT won) AS losses
+    FROM match_player
+    INNER JOIN match_info mi USING (match_id)
+    INNER JOIN player p USING (account_id)
+    ARRAY JOIN items
+    WHERE TRUE
+    AND %(hero_id)s = hero_id
+    AND (%(item_id)s IS NULL OR items.item_id = %(item_id)s)
+    AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s))
+    AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s))
+    AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+    AND (%(region)s IS NULL OR p.region_mode = %(region)s)
     GROUP BY hero_id, item_id
     ORDER BY wins + losses DESC;
     """
@@ -282,8 +272,6 @@ def get_hero_item_win_loss_stats(
                 "max_unix_timestamp": max_unix_timestamp,
                 "match_mode": match_mode,
                 "region": region,
-                "min_hero_matches": min_hero_matches_per_player,
-                "max_hero_matches": max_hero_matches_per_player,
             },
         )
     return [
@@ -466,9 +454,8 @@ def get_player_mmr_history(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT match_id, ranked_badge_level, team = mi.winning_team AS won, 'metadata' as source
+    SELECT match_id, ranked_badge_level, won, 'metadata' as source
     FROM match_player
-    INNER JOIN match_info mi USING (match_id)
     WHERE account_id IN %(account_ids)s
     ORDER BY match_id DESC;
     """
