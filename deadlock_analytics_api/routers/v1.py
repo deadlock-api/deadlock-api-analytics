@@ -274,7 +274,7 @@ def get_hero_leaderboard(
     ]
 
 
-class MatchSearchIDs(BaseModel):
+class MatchSearchResult(BaseModel):
     match_id: int
     start_time: datetime
     duration_s: int
@@ -285,8 +285,20 @@ class MatchSearchIDs(BaseModel):
 @router.get(
     "/matches/search-ids",
     summary="RateLimit: 100req/s",
+    deprecated=True,
+    include_in_schema=False,
 )
-def match_search_ids(
+def match_search_ids() -> RedirectResponse:
+    return RedirectResponse(
+        url="/v1/matches/search", status_code=HTTP_301_MOVED_PERMANENTLY
+    )
+
+
+@router.get(
+    "/matches/search",
+    summary="RateLimit: 100req/s",
+)
+def match_search(
     req: Request,
     res: Response,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
@@ -300,12 +312,12 @@ def match_search_ids(
     is_low_pri_pool: bool | None = None,
     is_new_player_pool: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=100000)] = 1000,
-) -> list[MatchSearchIDs]:
+) -> list[MatchSearchResult]:
     limiter.apply_limits(
         req,
         res,
-        "/v1/matches/search-ids",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
+        "/v1/matches/search",
+        [RateLimit(limit=100, period=1)],
     )
     query = """
     SELECT DISTINCT ON(match_id) match_id, start_time, duration_s, match_mode, game_mode
@@ -343,7 +355,7 @@ def match_search_ids(
             },
         )
     return [
-        MatchSearchIDs(
+        MatchSearchResult(
             match_id=r[0],
             start_time=r[1],
             duration_s=r[2],
@@ -352,80 +364,6 @@ def match_search_ids(
         )
         for r in result
     ]
-
-
-@router.get(
-    "/matches/search",
-    summary="RateLimit: 100req/min 1000req/hour, Apply for an API-Key to get higher limits",
-)
-def match_search(
-    req: Request,
-    res: Response,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: int | None = None,
-    min_match_id: Annotated[int | None, Query(ge=0)] = None,
-    max_match_id: int | None = None,
-    min_match_score: Annotated[int | None, Query(ge=0)] = None,
-    max_match_score: int | None = None,
-    limit: Annotated[int, Query(ge=1, le=10000)] = 1000,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
-    hero_id: int | None = None,
-    only_with_metadata: bool = False,
-) -> list[ActiveMatch]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/search",
-        [RateLimit(limit=100, period=60), RateLimit(limit=1000, period=3600)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    if min_unix_timestamp is None:
-        min_unix_timestamp = 0
-    if max_unix_timestamp is None:
-        max_unix_timestamp = 4070908800
-    if min_match_id is None:
-        min_match_id = 0
-    if max_match_id is None:
-        max_match_id = 999999999
-    if min_match_score is None:
-        min_match_score = 0
-    if max_match_score is None:
-        max_match_score = 5000
-    query = f"""
-    SELECT DISTINCT ON(match_id) {", ".join(ACTIVE_MATCHES_KEYS)}
-    FROM finished_matches
-    LEFT OUTER JOIN match_info mi ON mi.match_id = match_id
-    WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
-    AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
-    AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
-    AND (%(region)s IS NULL OR region_mode = %(region)s)
-    AND (%(hero_id)s IS NULL OR has(`players.hero_id`, %(hero_id)s))
-    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
-    AND (%(only_with_metadata)s = FALSE OR mi.match_id > 0)
-    ORDER BY match_id
-    LIMIT %(limit)s
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-                "min_match_id": min_match_id,
-                "max_match_id": max_match_id,
-                "min_match_score": min_match_score,
-                "max_match_score": max_match_score,
-                "limit": limit,
-                "region": region,
-                "hero_id": hero_id,
-                "match_mode": match_mode,
-                "only_with_metadata": only_with_metadata,
-            },
-        )
-    return [ActiveMatch.from_row(row) for row in result]
 
 
 @router.get(
