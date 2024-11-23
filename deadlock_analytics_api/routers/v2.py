@@ -330,24 +330,10 @@ class PlayerCardHistoryEntry(BaseModel):
 
 
 @router.get(
-    "/players/{account_id}/card-history",
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 10req/s",
-)
-def get_player_card_history_single(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> list[PlayerCardHistoryEntry]:
-    return get_player_card_history(req, res, account_ids=str(account_id))[0]
-
-
-@router.get(
     "/players/card-history",
     summary="RateLimit: 100req/s",
 )
-def get_player_card_history(
+def get_player_card_history_batch(
     req: Request,
     res: Response,
     account_ids: Annotated[
@@ -414,24 +400,10 @@ class PlayerMMRHistoryEntryV2(BaseModel):
 
 
 @router.get(
-    "/players/{account_id}/mmr-history",
-    summary="RateLimit: 10req/s & 1000req/10min, API-Key RateLimit: 100req/s & 10000req/10min",
-)
-def get_player_mmr_history_single(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> list[PlayerMMRHistoryEntryV2]:
-    return get_player_mmr_history(req, res, account_ids=str(account_id))[0]
-
-
-@router.get(
     "/players/mmr-history",
     summary="RateLimit: 100req/s",
 )
-def get_player_mmr_history(
+def get_player_mmr_history_batch(
     req: Request,
     res: Response,
     account_ids: Annotated[
@@ -515,32 +487,6 @@ class PlayerHeroStat(BaseModel):
             if self.highest_ranked_badge_level is not None
             else None
         )
-
-
-@router.get(
-    "/players/{account_id}/hero-stats",
-    summary="RateLimit: 100req/s",
-)
-def get_player_hero_stats(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-    hero_id: int | None = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-) -> list[PlayerHeroStat]:
-    return get_player_hero_stats_batch(
-        req,
-        res,
-        account_ids=str(account_id),
-        hero_id=hero_id,
-        min_unix_timestamp=min_unix_timestamp,
-        max_unix_timestamp=max_unix_timestamp,
-        match_mode=match_mode,
-    )[account_id]
 
 
 @router.get(
@@ -635,34 +581,6 @@ class PlayerItemStat(BaseModel):
 
 
 @router.get(
-    "/players/{account_id}/item-stats",
-    summary="RateLimit: 100req/s",
-)
-def get_player_item_stats(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-    hero_id: int | None = None,
-    item_id: int | None = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-) -> list[PlayerItemStat]:
-    return get_player_item_stats_batch(
-        req,
-        res,
-        account_ids=str(account_id),
-        hero_id=hero_id,
-        item_id=item_id,
-        min_unix_timestamp=min_unix_timestamp,
-        max_unix_timestamp=max_unix_timestamp,
-        match_mode=match_mode,
-    )[account_id]
-
-
-@router.get(
     "/players/item-stats",
     summary="RateLimit: 100req/s",
 )
@@ -733,6 +651,88 @@ def get_player_item_stats_batch(
             key=lambda x: x.account_id,
         )
     }
+
+
+@router.get(
+    "/players/{account_id}/card-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_card_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerCardHistoryEntry]:
+    return get_player_card_history_batch(req, res, account_ids=str(account_id))[0]
+
+
+@router.get(
+    "/players/{account_id}/item-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_item_stats(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+    hero_id: int | None = None,
+    item_id: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> list[PlayerItemStat]:
+    return get_player_item_stats_batch(
+        req,
+        res,
+        account_ids=str(account_id),
+        hero_id=hero_id,
+        item_id=item_id,
+        min_unix_timestamp=min_unix_timestamp,
+        max_unix_timestamp=max_unix_timestamp,
+        match_mode=match_mode,
+    )[account_id]
+
+
+@router.get(
+    "/players/{account_id}/hero-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_hero_stats(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+    hero_id: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> list[PlayerHeroStat]:
+    return get_player_hero_stats_batch(
+        req,
+        res,
+        account_ids=str(account_id),
+        hero_id=hero_id,
+        min_unix_timestamp=min_unix_timestamp,
+        max_unix_timestamp=max_unix_timestamp,
+        match_mode=match_mode,
+    )[account_id]
+
+
+@router.get(
+    "/players/{account_id}/mmr-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_mmr_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerMMRHistoryEntryV2]:
+    return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
 
 
 class PlayerMate(BaseModel):
