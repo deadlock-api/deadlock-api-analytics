@@ -418,15 +418,14 @@ def get_player_item_stats_batch(
         SELECT
             account_id,
             hero_id,
-            items.item_id as item_id,
-            count(*)                                                                                   AS matches,
-            sum(team = mi.winning_team)                                                                AS wins
-        FROM default.match_player
+            item_id,
+            count(*) AS matches,
+            countIf(won) AS wins
+        FROM match_player_item
         INNER JOIN default.match_info AS mi USING (match_id)
-        ARRAY JOIN items
         WHERE account_id IN %(account_ids)s
         AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
-        AND (%(item_id)s IS NULL OR items.item_id = %(item_id)s)
+        AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
