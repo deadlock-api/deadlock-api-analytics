@@ -1,51 +1,28 @@
 import itertools
-from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Path, Query
-from pydantic import BaseModel, Field, computed_field
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
+from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.routers.v1 import HeroWinLossStat
+from deadlock_analytics_api.routers.v2_models import (
+    ItemWinLossStat,
+    PlayerCardHistoryEntry,
+    PlayerHeroStat,
+    PlayerItemStat,
+    PlayerLeaderboardV2,
+    PlayerMate,
+    PlayerMMRHistoryEntryV2,
+    PlayerParty,
+)
 
 router = APIRouter(prefix="/v2", tags=["V2"])
-
-
-class PlayerLeaderboardV2(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    region_mode: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = Field(None)
-    leaderboard_rank: int
-    wins: int
-    matches_played: int
-    kills: int
-    deaths: int
-    assists: int
-    ranked_badge_level: int | None = None
-
-    @computed_field
-    @property
-    def ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
 
 
 @router.get(
@@ -209,13 +186,6 @@ def get_hero_win_loss_stats(
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
 
 
-class ItemWinLossStat(BaseModel):
-    hero_id: int
-    item_id: int
-    wins: int
-    losses: int
-
-
 @router.get("/hero/{hero_id}/item-win-loss-stats", summary="RateLimit: 100req/s")
 def get_hero_item_win_loss_stats(
     req: Request,
@@ -278,215 +248,6 @@ def get_hero_item_win_loss_stats(
         ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3])
         for r in result
     ]
-
-
-class PlayerCardSlot(BaseModel):
-    slots_id: int
-    hero_id: int
-    hero_kills: int
-    hero_wins: int
-    # stat_id: int # Always 0
-    # stat_score: int # Always 0
-
-
-class PlayerCardHistoryEntry(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    created_at: datetime
-    slots: list[PlayerCardSlot]
-    ranked_badge_level: int
-
-    @classmethod
-    def from_row(cls, row) -> "PlayerCardHistoryEntry":
-        return cls(
-            slots=[
-                PlayerCardSlot(
-                    **{
-                        k.replace("slots_", "", 1): v[0] if isinstance(v, list) else v
-                        for k, v in row.items()
-                        if k.startswith("slots_")
-                    }
-                )
-            ],
-            **{k: v for k, v in row.items() if not k.startswith("slots_")},
-        )
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
-
-
-@router.get(
-    "/players/card-history",
-    summary="RateLimit: 100req/s",
-)
-def get_player_card_history_batch(
-    req: Request,
-    res: Response,
-    account_ids: Annotated[
-        str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
-    ],
-) -> list[list[PlayerCardHistoryEntry]]:
-    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
-    if len(account_ids) > 100:
-        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
-
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/players/card-history",
-        [RateLimit(limit=100, period=1)],
-        count=len(account_ids),
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT *
-    FROM player_card
-    WHERE account_id IN %(account_ids)s
-    ORDER BY account_id, created_at DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result, keys = client.execute(
-            query, {"account_ids": account_ids}, with_column_types=True
-        )
-    result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    cards = [PlayerCardHistoryEntry.from_row(r) for r in result]
-    cards_grouped = itertools.groupby(cards, key=lambda x: x.account_id)
-    return [list(cards) for account_id, cards in cards_grouped]
-
-
-class PlayerMMRHistoryEntryV2(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    match_id: int
-    won: bool = Field(False)
-    source: str
-    match_ranked_badge_level: int | None = Field(None)
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-
-@router.get(
-    "/players/mmr-history",
-    summary="RateLimit: 100req/s",
-)
-def get_player_mmr_history_batch(
-    req: Request,
-    res: Response,
-    account_ids: Annotated[
-        str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
-    ],
-) -> list[list[PlayerMMRHistoryEntryV2]]:
-    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
-    if len(account_ids) > 100:
-        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
-
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/players/mmr-history",
-        [RateLimit(limit=100, period=1)],
-        count=len(account_ids),
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT match_id, ranked_badge_level, won, 'metadata' as source
-    FROM match_player
-    WHERE account_id IN %(account_ids)s
-    ORDER BY match_id DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_ids": account_ids})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    return [
-        [
-            PlayerMMRHistoryEntryV2(
-                account_id=account_id,
-                match_id=r[0],
-                match_ranked_badge_level=r[1],
-                won=r[2],
-                source=r[3],
-            )
-            for r in result
-        ]
-        for account_id in account_ids
-    ]
-
-
-class PlayerHeroStat(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    hero_id: int
-    matches: int
-    wins: int
-    kills: int
-    deaths: int
-    assists: int
-    ending_level: float
-    denies_per_match: float
-    networth_per_min: float
-    damage_mitigated_per_min: float
-    damage_taken_per_min: float
-    creeps_per_min: float
-    denies_per_min: float
-    obj_damage_per_min: float
-    accuracy: float
-    crit_shot_rate: float
-    highest_ranked_badge_level: int | None = None
-
-    @computed_field
-    @property
-    def highest_ranked_rank(self) -> int | None:
-        return (
-            self.highest_ranked_badge_level // 10
-            if self.highest_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def highest_ranked_subrank(self) -> int | None:
-        return (
-            self.highest_ranked_badge_level % 10
-            if self.highest_ranked_badge_level is not None
-            else None
-        )
 
 
 @router.get(
@@ -572,12 +333,30 @@ def get_player_hero_stats_batch(
     }
 
 
-class PlayerItemStat(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    hero_id: int
-    item_id: int
-    wins: int
-    matches: int
+@router.get(
+    "/players/{account_id}/hero-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_hero_stats(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+    hero_id: int | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> list[PlayerHeroStat]:
+    return get_player_hero_stats_batch(
+        req,
+        res,
+        account_ids=str(account_id),
+        hero_id=hero_id,
+        min_unix_timestamp=min_unix_timestamp,
+        max_unix_timestamp=max_unix_timestamp,
+        match_mode=match_mode,
+    )[account_id]
 
 
 @router.get(
@@ -654,20 +433,6 @@ def get_player_item_stats_batch(
 
 
 @router.get(
-    "/players/{account_id}/card-history",
-    summary="RateLimit: 100req/s",
-)
-def get_player_card_history(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> list[PlayerCardHistoryEntry]:
-    return get_player_card_history_batch(req, res, account_ids=str(account_id))[0]
-
-
-@router.get(
     "/players/{account_id}/item-stats",
     summary="RateLimit: 100req/s",
 )
@@ -696,57 +461,27 @@ def get_player_item_stats(
 
 
 @router.get(
-    "/players/{account_id}/hero-stats",
-    summary="RateLimit: 100req/s",
-)
-def get_player_hero_stats(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-    hero_id: int | None = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-) -> list[PlayerHeroStat]:
-    return get_player_hero_stats_batch(
-        req,
-        res,
-        account_ids=str(account_id),
-        hero_id=hero_id,
-        min_unix_timestamp=min_unix_timestamp,
-        max_unix_timestamp=max_unix_timestamp,
-        match_mode=match_mode,
-    )[account_id]
-
-
-@router.get(
-    "/players/{account_id}/mmr-history",
-    summary="RateLimit: 100req/s",
-)
-def get_player_mmr_history(
-    req: Request,
-    res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
-) -> list[PlayerMMRHistoryEntryV2]:
-    return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
-
-
-class PlayerMate(BaseModel):
-    mate_id: int = Field(description="The account id of the mate, it's a SteamID3")
-    wins: int
-    matches_played: int
-    matches: list[int]
-
-
-@router.get(
     "/players/{account_id}/mates",
     summary="RateLimit: 100req/s",
+    include_in_schema=False,
+    deprecated=True,
 )
 def get_player_mates(
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+):
+    return RedirectResponse(
+        url=f"/v2/players/{account_id}/mate-stats",
+        status_code=HTTP_301_MOVED_PERMANENTLY,
+    )
+
+
+@router.get(
+    "/players/{account_id}/mate-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_mate_stats(
     req: Request,
     res: Response,
     account_id: Annotated[
@@ -759,7 +494,7 @@ def get_player_mates(
     limiter.apply_limits(
         req,
         res,
-        "/v2/players/{account_id}/mates",
+        "/v2/players/{account_id}/mate-stats",
         [RateLimit(limit=100, period=1)],
     )
     account_id = utils.validate_steam_id(account_id)
@@ -791,18 +526,28 @@ def get_player_mates(
     return [PlayerMate(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
 
 
-class PlayerParty(BaseModel):
-    party_size: int
-    wins: int
-    matches_played: int
-    matches: list[int]
-
-
 @router.get(
     "/players/{account_id}/parties",
     summary="RateLimit: 100req/s",
+    include_in_schema=False,
+    deprecated=True,
 )
 def get_player_parties(
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+):
+    return RedirectResponse(
+        url=f"/v2/players/{account_id}/party-stats",
+        status_code=HTTP_301_MOVED_PERMANENTLY,
+    )
+
+
+@router.get(
+    "/players/{account_id}/party-stats",
+    summary="RateLimit: 100req/s",
+)
+def get_player_party_stats(
     req: Request,
     res: Response,
     account_id: Annotated[
@@ -815,7 +560,7 @@ def get_player_parties(
     limiter.apply_limits(
         req,
         res,
-        "/v2/players/{account_id}/parties",
+        "/v2/players/{account_id}/party-stats",
         [RateLimit(limit=100, period=1)],
     )
     account_id = utils.validate_steam_id(account_id)
@@ -848,6 +593,129 @@ def get_player_parties(
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
     return [PlayerParty(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+
+
+@router.get(
+    "/players/card-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_card_history_batch(
+    req: Request,
+    res: Response,
+    account_ids: Annotated[
+        str,
+        Query(
+            description="Comma separated account ids of the players, at most 100 allowed"
+        ),
+    ],
+) -> list[list[PlayerCardHistoryEntry]]:
+    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
+    if len(account_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
+
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/card-history",
+        [RateLimit(limit=100, period=1)],
+        count=len(account_ids),
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT *
+    FROM player_card
+    WHERE account_id IN %(account_ids)s
+    ORDER BY account_id, created_at DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result, keys = client.execute(
+            query, {"account_ids": account_ids}, with_column_types=True
+        )
+    result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    cards = [PlayerCardHistoryEntry.from_row(r) for r in result]
+    cards_grouped = itertools.groupby(cards, key=lambda x: x.account_id)
+    return [list(cards) for account_id, cards in cards_grouped]
+
+
+@router.get(
+    "/players/{account_id}/card-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_card_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerCardHistoryEntry]:
+    return get_player_card_history_batch(req, res, account_ids=str(account_id))[0]
+
+
+@router.get(
+    "/players/mmr-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_mmr_history_batch(
+    req: Request,
+    res: Response,
+    account_ids: Annotated[
+        str,
+        Query(
+            description="Comma separated account ids of the players, at most 100 allowed"
+        ),
+    ],
+) -> list[list[PlayerMMRHistoryEntryV2]]:
+    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
+    if len(account_ids) > 100:
+        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
+
+    limiter.apply_limits(
+        req,
+        res,
+        "/v2/players/mmr-history",
+        [RateLimit(limit=100, period=1)],
+        count=len(account_ids),
+    )
+    res.headers["Cache-Control"] = "public, max-age=300"
+    query = """
+    SELECT match_id, ranked_badge_level, won, 'metadata' as source
+    FROM match_player
+    WHERE account_id IN %(account_ids)s
+    ORDER BY match_id DESC;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(query, {"account_ids": account_ids})
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return [
+        [
+            PlayerMMRHistoryEntryV2(
+                account_id=account_id,
+                match_id=r[0],
+                match_ranked_badge_level=r[1],
+                won=r[2],
+                source=r[3],
+            )
+            for r in result
+        ]
+        for account_id in account_ids
+    ]
+
+
+@router.get(
+    "/players/{account_id}/mmr-history",
+    summary="RateLimit: 100req/s",
+)
+def get_player_mmr_history(
+    req: Request,
+    res: Response,
+    account_id: Annotated[
+        int, Path(description="The account id of the player, it's a SteamID3")
+    ],
+) -> list[PlayerMMRHistoryEntryV2]:
+    return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
 
 
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
