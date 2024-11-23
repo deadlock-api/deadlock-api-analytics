@@ -237,16 +237,15 @@ def get_hero_item_win_loss_stats_cached(
     query = """
     SELECT
         hero_id,
-        items.item_id AS item_id,
+        item_id,
         countIf(won) AS wins,
         countIf(NOT won) AS losses
-    FROM match_player
+    FROM match_player_item
     INNER JOIN match_info mi USING (match_id)
     INNER JOIN player p USING (account_id)
-    ARRAY JOIN items
     WHERE TRUE
     AND %(hero_id)s = hero_id
-    AND (%(item_id)s IS NULL OR items.item_id = %(item_id)s)
+    AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
     AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
     AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
