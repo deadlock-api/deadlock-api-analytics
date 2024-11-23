@@ -1,6 +1,7 @@
 import itertools
 from typing import Annotated, Literal
 
+from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException, Path, Query
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
@@ -207,7 +208,32 @@ def get_hero_item_win_loss_stats(
         "/v2/hero/{hero_id}/item-win-loss-stats",
         [RateLimit(limit=100, period=1)],
     )
-    res.headers["Cache-Control"] = "public, max-age=1200"
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    return get_hero_item_win_loss_stats_cached(
+        hero_id,
+        item_id,
+        min_badge_level,
+        max_badge_level,
+        min_unix_timestamp,
+        max_unix_timestamp,
+        match_mode,
+        region,
+    )
+
+
+@ttl_cache(ttl=3600)
+def get_hero_item_win_loss_stats_cached(
+    hero_id: int,
+    item_id: int | None = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (
+        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
+    ) = None,
+) -> list[ItemWinLossStat]:
     query = """
     SELECT
         hero_id,
