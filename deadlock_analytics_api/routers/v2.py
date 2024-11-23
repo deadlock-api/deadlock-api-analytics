@@ -364,7 +364,7 @@ def get_player_card_history(
     limiter.apply_limits(
         req,
         res,
-        "/v2/players/{account_id}/card-history",
+        "/v2/players/card-history",
         [RateLimit(limit=100, period=1)],
         count=len(account_ids),
     )
@@ -448,7 +448,7 @@ def get_player_mmr_history(
     limiter.apply_limits(
         req,
         res,
-        "/v2/players/{account_id}/mmr-history",
+        "/v2/players/mmr-history",
         [RateLimit(limit=100, period=1)],
         count=len(account_ids),
     )
@@ -567,7 +567,7 @@ def get_player_hero_stats_batch(
     limiter.apply_limits(
         req,
         res,
-        "/v2/players/{account_id}/hero-stats",
+        "/v2/players/hero-stats",
         [RateLimit(limit=100, period=1)],
         count=len(account_ids),
     )
