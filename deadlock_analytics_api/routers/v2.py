@@ -289,6 +289,8 @@ def get_player_hero_stats_batch(
         ),
     ],
     hero_id: int | None = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
@@ -331,6 +333,8 @@ def get_player_hero_stats_batch(
         AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+        AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
         GROUP BY account_id, hero_id
         ORDER BY account_id, hero_id;
@@ -343,6 +347,8 @@ def get_player_hero_stats_batch(
                 "hero_id": hero_id,
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
                 "match_mode": match_mode,
             },
             with_column_types=True,
