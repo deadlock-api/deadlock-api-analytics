@@ -296,6 +296,8 @@ def match_search_ids(
     max_match_id: int | None = None,
     min_duration_s: Annotated[int | None, Query(ge=0)] = None,
     max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    min_average_badge: Annotated[int | None, Query(ge=0)] = None,
+    max_average_badge: Annotated[int | None, Query(le=116)] = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     is_high_skill_range_parties: bool | None = None,
     is_low_pri_pool: bool | None = None,
@@ -319,6 +321,8 @@ def match_search(
     max_match_id: int | None = None,
     min_duration_s: Annotated[int | None, Query(ge=0)] = None,
     max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    min_average_badge: Annotated[int | None, Query(ge=0)] = None,
+    max_average_badge: Annotated[int | None, Query(le=116)] = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     is_high_skill_range_parties: bool | None = None,
     is_low_pri_pool: bool | None = None,
@@ -342,6 +346,8 @@ def match_search(
     AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
     AND (%(min_duration_s)s IS NULL OR duration_s >= %(min_duration_s)s)
     AND (%(max_duration_s)s IS NULL OR duration_s <= %(max_duration_s)s)
+    AND (%(min_average_badge)s IS NULL OR least(average_badge_team0, average_badge_team1) >= %(min_average_badge)s)
+    AND (%(max_average_badge)s IS NULL OR greatest(average_badge_team0, average_badge_team1) <= %(max_average_badge)s)
     AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
     AND (%(is_high_skill_range_party)s IS NULL OR is_high_skill_range_parties = %(is_high_skill_range_party)s)
     AND (%(is_low_pri_pool)s IS NULL OR low_pri_pool = %(is_low_pri_pool)s)
@@ -359,6 +365,8 @@ def match_search(
                 "max_match_id": max_match_id,
                 "min_duration_s": min_duration_s,
                 "max_duration_s": max_duration_s,
+                "min_average_badge": min_average_badge,
+                "max_average_badge": max_average_badge,
                 "match_mode": match_mode,
                 "is_high_skill_range_party": is_high_skill_range_parties,
                 "is_low_pri_pool": is_low_pri_pool,
