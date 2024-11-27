@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir uvicorn && \
 
 COPY . .
 
-CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8080", "--threads", "8", "deadlock_analytics_api.main:app"]
+CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8080", "--workers", "16", "deadlock_analytics_api.main:app"]
