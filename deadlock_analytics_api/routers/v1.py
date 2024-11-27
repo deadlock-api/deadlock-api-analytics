@@ -288,8 +288,21 @@ class MatchSearchResult(BaseModel):
     deprecated=True,
     include_in_schema=False,
 )
-def match_search_ids(req: Request) -> RedirectResponse:
-    url = req.url_for("match_search").include_query_params()
+def match_search_ids(
+    req: Request,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    is_high_skill_range_parties: bool | None = None,
+    is_low_pri_pool: bool | None = None,
+    is_new_player_pool: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=100000)] = 1000,
+) -> RedirectResponse:
+    url = req.url_for("match_search").include_query_params(**req.query_params)
     return RedirectResponse(url=url, status_code=HTTP_301_MOVED_PERMANENTLY)
 
 
