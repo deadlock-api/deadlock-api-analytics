@@ -288,10 +288,9 @@ class MatchSearchResult(BaseModel):
     deprecated=True,
     include_in_schema=False,
 )
-def match_search_ids() -> RedirectResponse:
-    return RedirectResponse(
-        url="/v1/matches/search", status_code=HTTP_301_MOVED_PERMANENTLY
-    )
+def match_search_ids(req: Request) -> RedirectResponse:
+    url = req.url_for("match_search").include_query_params()
+    return RedirectResponse(url=url, status_code=HTTP_301_MOVED_PERMANENTLY)
 
 
 @router.get(
