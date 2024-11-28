@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -125,6 +125,13 @@ class Bundle(BaseModel):
     manifest_path: str
     match_ids: list[int]
     created_at: datetime | None = Field(None)
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def utc_created_at(cls, v: datetime | None = None) -> datetime | None:
+        if v is None:
+            return None
+        return v.astimezone(timezone.utc)
 
 
 @router.post("/bundles")

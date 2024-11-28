@@ -1,11 +1,11 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from clickhouse_driver import Client
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response, StreamingResponse
@@ -290,6 +290,11 @@ class MatchSearchResult(BaseModel):
     match_mode: str
     game_mode: str
 
+    @field_validator("start_time", mode="before")
+    @classmethod
+    def utc_start_time(cls, v: datetime) -> datetime:
+        return v.astimezone(timezone.utc)
+
 
 @router.get(
     "/matches/search-ids",
@@ -559,7 +564,11 @@ def get_all_finished_matches(
                 continue
             yield (
                 ",".join(
-                    (str(c) if not isinstance(c, datetime) else c.isoformat())
+                    (
+                        str(c)
+                        if not isinstance(c, datetime)
+                        else c.astimezone(timezone.utc)
+                    )
                     for c in row
                 )
                 + "\n"
@@ -595,7 +604,11 @@ def get_matches_by_account_id(
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Not found")
     return [
-        {"match_id": r[0], "start_time": r[1].isoformat(), "ranked_badge_level": r[2]}
+        {
+            "match_id": r[0],
+            "start_time": r[1].astimezone(timezone.utc),
+            "ranked_badge_level": r[2],
+        }
         for r in result
     ]
 

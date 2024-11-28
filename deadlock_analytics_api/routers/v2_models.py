@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 
 class PlayerLeaderboardV2(BaseModel):
@@ -57,6 +57,11 @@ class PlayerCardHistoryEntry(BaseModel):
     created_at: datetime
     slots: list[PlayerCardSlot]
     ranked_badge_level: int
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def utc_created_at(cls, v: datetime) -> datetime:
+        return v.astimezone(timezone.utc)
 
     @classmethod
     def from_row(cls, row) -> "PlayerCardHistoryEntry":

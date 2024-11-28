@@ -1,6 +1,6 @@
-import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 ACTIVE_MATCHES_KEYS = [
     "`players.team`",
@@ -102,8 +102,8 @@ class ActiveMatch(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     match_id: int
-    start_time: str
-    scraped_at: str
+    start_time: datetime
+    scraped_at: datetime
     winning_team: int
     players: list[ActiveMatchPlayer]
     lobby_id: int
@@ -121,6 +121,11 @@ class ActiveMatch(BaseModel):
     compat_version: int | None = Field(None)
     ranked_badge_level: int | None = Field(None)
 
+    @field_validator("start_time", "scraped_at", mode="before")
+    @classmethod
+    def utc_start_time(cls, v: datetime) -> datetime:
+        return v.astimezone(timezone.utc)
+
     @computed_field
     @property
     def objectives_team0(self) -> ActiveMatchObjectives | None:
@@ -135,9 +140,7 @@ class ActiveMatch(BaseModel):
     def from_row(cls, row) -> "ActiveMatch":
         return cls(
             **{
-                k: col if not isinstance(col, datetime.datetime) else col.isoformat()
-                for k, col in zip(ACTIVE_MATCHES_KEYS, row)
-                if not "players" in k
+                k: col for k, col in zip(ACTIVE_MATCHES_KEYS, row) if "players" not in k
             },
             players=[
                 ActiveMatchPlayer(
