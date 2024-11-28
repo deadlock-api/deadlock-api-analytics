@@ -750,7 +750,7 @@ def get_player_mmr_history(
 
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
 def get_matches_by_account_id(
-    req: Request, res: Response, account_id: int
+    req: Request, res: Response, account_id: int, has_metadata: bool | None = None
 ) -> list[dict]:
     limiter.apply_limits(
         req,
@@ -761,14 +761,18 @@ def get_matches_by_account_id(
     res.headers["Cache-Control"] = "public, max-age=300"
     account_id = utils.validate_steam_id(account_id)
     query = """
-    SELECT DISTINCT ON(match_id) *
-    FROM player_match_history
+    SELECT DISTINCT ON(pmh.match_id) pmh.*, toBool(mi.match_id > 0) AS has_metadata
+    FROM player_match_history pmh
+    LEFT JOIN match_info mi USING (match_id)
     WHERE account_id = %(account_id)s
+    AND (%(has_metadata)s IS NULL OR toBool(mi.match_id > 0) = %(has_metadata)s)
     ORDER BY match_id DESC
     """
     with CH_POOL.get_client() as client:
         entries, keys = client.execute(
-            query, {"account_id": account_id}, with_column_types=True
+            query,
+            {"account_id": account_id, "has_metadata": has_metadata},
+            with_column_types=True,
         )
     if len(entries) == 0:
         raise HTTPException(status_code=404, detail="Not found")
