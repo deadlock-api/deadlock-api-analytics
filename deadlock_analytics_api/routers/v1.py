@@ -60,9 +60,18 @@ def get_api_info(req: Request, res: Response) -> APIInfo:
     ORDER BY table;
     """
     query2 = """
+    WITH fetched_matches AS (
+        SELECT match_id
+        FROM match_info
+        WHERE created_at > now() - INTERVAL 1 DAY
+        UNION
+        DISTINCT
+        SELECT match_id
+        FROM match_salts
+        WHERE created_at > now() - INTERVAL 1 DAY
+    )
     SELECT COUNT() as fetched_matches_per_day
-    FROM match_salts
-    WHERE created_at > now() - INTERVAL 1 DAY;
+    FROM fetched_matches;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
