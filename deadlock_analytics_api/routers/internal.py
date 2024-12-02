@@ -51,9 +51,7 @@ def get_recent_matches(
 def get_missing_matches(
     req: Request, res: Response, limit: Annotated[int, Query(ge=1, le=100)] = 100
 ) -> JSONResponse:
-    limiter.apply_limits(
-        req, res, "/v1/missing-matches", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v1/missing-matches", [RateLimit(limit=100, period=1)])
     query = """
     WITH matches AS (
         SELECT DISTINCT match_id, toUnixTimestamp(start_time) AS start_time FROM finished_matches

@@ -139,9 +139,7 @@ class ActiveMatch(BaseModel):
     @classmethod
     def from_row(cls, row) -> "ActiveMatch":
         return cls(
-            **{
-                k: col for k, col in zip(ACTIVE_MATCHES_KEYS, row) if "players" not in k
-            },
+            **{k: col for k, col in zip(ACTIVE_MATCHES_KEYS, row) if "players" not in k},
             players=[
                 ActiveMatchPlayer(
                     account_id=account_id,
@@ -149,8 +147,6 @@ class ActiveMatch(BaseModel):
                     abandoned=abandoned,
                     hero_id=hero_id,
                 )
-                for team, account_id, abandoned, hero_id in zip(
-                    row[0], row[1], row[2], row[3]
-                )
+                for team, account_id, abandoned, hero_id in zip(row[0], row[1], row[2], row[3])
             ],
         )

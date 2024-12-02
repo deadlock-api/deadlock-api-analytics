@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field, computed_field, field_validator
 
 class PlayerLeaderboardV2(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    region_mode: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = Field(None)
+    region_mode: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None = Field(
+        None
+    )
     leaderboard_rank: int
     wins: int
     matches_played: int
@@ -20,20 +20,12 @@ class PlayerLeaderboardV2(BaseModel):
     @computed_field
     @property
     def ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level // 10 if self.ranked_badge_level is not None else None
 
     @computed_field
     @property
     def ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
 class ItemWinLossStat(BaseModel):
@@ -81,20 +73,12 @@ class PlayerCardHistoryEntry(BaseModel):
     @computed_field
     @property
     def match_ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level // 10 if self.ranked_badge_level is not None else None
 
     @computed_field
     @property
     def match_ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
 class PlayerMMRHistoryEntryV2(BaseModel):

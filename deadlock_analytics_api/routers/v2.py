@@ -93,9 +93,7 @@ def get_leaderboard_by_region(
     limit: Annotated[int, Query(le=10000)] = 1000,
     sort_by: Literal["winrate", "wins", "matches"] | None = None,
 ) -> list[PlayerLeaderboardV2]:
-    limiter.apply_limits(
-        req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     order_by_clause = {
         "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
@@ -111,9 +109,7 @@ def get_leaderboard_by_region(
     OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(
-            query, {"start": start - 1, "limit": limit, "region": region}
-        )
+        result = client.execute(query, {"start": start - 1, "limit": limit, "region": region})
     return [
         PlayerLeaderboardV2(
             account_id=r[0],
@@ -141,13 +137,9 @@ def get_hero_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[HeroWinLossStat]:
-    limiter.apply_limits(
-        req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     WITH filtered_players AS (
@@ -199,9 +191,7 @@ def get_hero_item_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[ItemWinLossStat]:
     limiter.apply_limits(
         req,
@@ -231,9 +221,7 @@ def get_hero_item_win_loss_stats_cached(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[ItemWinLossStat]:
     query = """
     SELECT
@@ -270,10 +258,7 @@ def get_hero_item_win_loss_stats_cached(
                 "region": region,
             },
         )
-    return [
-        ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3])
-        for r in result
-    ]
+    return [ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3]) for r in result]
 
 
 @router.get(
@@ -285,9 +270,7 @@ def get_player_hero_stats_batch(
     res: Response,
     account_ids: Annotated[
         str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
+        Query(description="Comma separated account ids of the players, at most 100 allowed"),
     ],
     hero_id: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -372,9 +355,7 @@ def get_player_hero_stats_batch(
 def get_player_hero_stats(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
     hero_id: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
@@ -400,9 +381,7 @@ def get_player_item_stats_batch(
     res: Response,
     account_ids: Annotated[
         str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
+        Query(description="Comma separated account ids of the players, at most 100 allowed"),
     ],
     hero_id: int | None = None,
     item_id: int | None = None,
@@ -470,9 +449,7 @@ def get_player_item_stats_batch(
 def get_player_item_stats(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
     hero_id: int | None = None,
     item_id: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
@@ -498,9 +475,7 @@ def get_player_item_stats(
     deprecated=True,
 )
 def get_player_mates(
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ):
     return RedirectResponse(
         url=f"/v2/players/{account_id}/mate-stats",
@@ -515,9 +490,7 @@ def get_player_mates(
 def get_player_mate_stats(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
@@ -564,9 +537,7 @@ def get_player_mate_stats(
     deprecated=True,
 )
 def get_player_parties(
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ):
     return RedirectResponse(
         url=f"/v2/players/{account_id}/party-stats",
@@ -581,9 +552,7 @@ def get_player_parties(
 def get_player_party_stats(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
@@ -635,9 +604,7 @@ def get_player_card_history_batch(
     res: Response,
     account_ids: Annotated[
         str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
+        Query(description="Comma separated account ids of the players, at most 100 allowed"),
     ],
 ) -> list[list[PlayerCardHistoryEntry]]:
     account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
@@ -659,9 +626,7 @@ def get_player_card_history_batch(
     ORDER BY account_id, created_at DESC;
     """
     with CH_POOL.get_client() as client:
-        result, keys = client.execute(
-            query, {"account_ids": account_ids}, with_column_types=True
-        )
+        result, keys = client.execute(query, {"account_ids": account_ids}, with_column_types=True)
     result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
     if len(result) == 0:
         raise HTTPException(status_code=404, detail="Player not found")
@@ -677,9 +642,7 @@ def get_player_card_history_batch(
 def get_player_card_history(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ) -> list[PlayerCardHistoryEntry]:
     return get_player_card_history_batch(req, res, account_ids=str(account_id))[0]
 
@@ -693,9 +656,7 @@ def get_player_mmr_history_batch(
     res: Response,
     account_ids: Annotated[
         str,
-        Query(
-            description="Comma separated account ids of the players, at most 100 allowed"
-        ),
+        Query(description="Comma separated account ids of the players, at most 100 allowed"),
     ],
 ) -> list[list[PlayerMMRHistoryEntryV2]]:
     account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
@@ -742,9 +703,7 @@ def get_player_mmr_history_batch(
 def get_player_mmr_history(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ) -> list[PlayerMMRHistoryEntryV2]:
     return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
 

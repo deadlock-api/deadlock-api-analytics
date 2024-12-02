@@ -42,9 +42,7 @@ class APIKeyHeaderOrQuery(APIKeyBase):
         header_api_key = request.headers.get(self.header_model.name)
         if not query_api_key and not header_api_key:
             if self.auto_error:
-                raise HTTPException(
-                    status_code=HTTP_403_FORBIDDEN, detail="Not authenticated"
-                )
+                raise HTTPException(status_code=HTTP_403_FORBIDDEN, detail="Not authenticated")
             else:
                 return None
         return query_api_key or header_api_key

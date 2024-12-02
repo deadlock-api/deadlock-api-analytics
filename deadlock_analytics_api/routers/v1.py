@@ -96,12 +96,8 @@ class MatchScoreDistribution(BaseModel):
 
 
 @router.get("/match-score-distribution", summary="RateLimit: 100req/s")
-def get_match_score_distribution(
-    req: Request, res: Response
-) -> list[MatchScoreDistribution]:
-    limiter.apply_limits(
-        req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)]
-    )
+def get_match_score_distribution(req: Request, res: Response) -> list[MatchScoreDistribution]:
+    limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT match_score as score, COUNT(DISTINCT match_id) as match_score_count
@@ -122,25 +118,19 @@ class MatchBadgeLevelDistribution(BaseModel):
     @computed_field
     @property
     def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_badge_level // 10 if self.match_badge_level is not None else None
-        )
+        return self.match_badge_level // 10 if self.match_badge_level is not None else None
 
     @computed_field
     @property
     def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_badge_level % 10 if self.match_badge_level is not None else None
-        )
+        return self.match_badge_level % 10 if self.match_badge_level is not None else None
 
 
 @router.get("/match-badge-level-distribution", summary="RateLimit: 100req/s")
 def get_match_badge_level_distribution(
     req: Request, res: Response
 ) -> list[MatchBadgeLevelDistribution]:
-    limiter.apply_limits(
-        req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
     SELECT ranked_badge_level, COUNT(DISTINCT match_id) as match_score_count
@@ -151,10 +141,7 @@ def get_match_badge_level_distribution(
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
-    return [
-        MatchBadgeLevelDistribution(match_badge_level=row[0], count=row[1])
-        for row in result
-    ]
+    return [MatchBadgeLevelDistribution(match_badge_level=row[0], count=row[1]) for row in result]
 
 
 class PlayerBadgeLevelDistribution(BaseModel):
@@ -168,9 +155,7 @@ def get_player_badge_level_distribution(
     res: Response,
     min_unix_timestamp: int | None = None,
     max_unix_timestamp: int | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[PlayerBadgeLevelDistribution]:
     limiter.apply_limits(
         req,
@@ -206,10 +191,7 @@ def get_player_badge_level_distribution(
                 "region": region,
             },
         )
-    return [
-        PlayerBadgeLevelDistribution(player_badge_level=row[0], count=row[1])
-        for row in result
-    ]
+    return [PlayerBadgeLevelDistribution(player_badge_level=row[0], count=row[1]) for row in result]
 
 
 class RegionDistribution(BaseModel):
@@ -218,9 +200,7 @@ class RegionDistribution(BaseModel):
 
 
 @router.get("/match-region-distribution", summary="RateLimit: 100req/s")
-def get_match_region_distribution(
-    req: Request, res: Response
-) -> list[RegionDistribution]:
+def get_match_region_distribution(req: Request, res: Response) -> list[RegionDistribution]:
     limiter.apply_limits(
         req, res, "/v1/match-region-distribution", [RateLimit(limit=100, period=1)]
     )
@@ -277,10 +257,7 @@ def get_hero_leaderboard(
                 "min_total_games": min_total_games,
             },
         )
-    return [
-        HeroLeaderboard(hero_id=r[0], account_id=r[1], wins=r[2], total=r[3])
-        for r in result
-    ]
+    return [HeroLeaderboard(hero_id=r[0], account_id=r[1], wins=r[2], total=r[3]) for r in result]
 
 
 class MatchSearchResult(BaseModel):
@@ -490,9 +467,7 @@ def get_all_finished_matches(
     min_match_score: Annotated[int | None, Query(ge=0)] = None,
     max_match_score: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (
-        Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None
-    ) = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
     hero_id: int | None = None,
 ) -> StreamingResponse:
     limiter.apply_limits(
@@ -564,11 +539,7 @@ def get_all_finished_matches(
                 continue
             yield (
                 ",".join(
-                    (
-                        str(c)
-                        if not isinstance(c, datetime)
-                        else c.astimezone(timezone.utc)
-                    )
+                    (str(c) if not isinstance(c, datetime) else c.astimezone(timezone.utc))
                     for c in row
                 )
                 + "\n"
@@ -582,9 +553,7 @@ def get_all_finished_matches(
     deprecated=True,
     summary="RateLimit: 100req/s",
 )
-def get_matches_by_account_id(
-    req: Request, res: Response, account_id: int
-) -> list[dict]:
+def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> list[dict]:
     limiter.apply_limits(
         req,
         res,
@@ -628,9 +597,7 @@ def get_hero_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
 ) -> list[HeroWinLossStat]:
-    limiter.apply_limits(
-        req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)])
     if min_match_score is None:
         min_match_score = 0
     if max_match_score is None:
@@ -675,20 +642,12 @@ class PlayerLeaderboardV1(BaseModel):
     @computed_field
     @property
     def ranked_rank(self) -> int | None:
-        return (
-            self.ranked_badge_level // 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level // 10 if self.ranked_badge_level is not None else None
 
     @computed_field
     @property
     def ranked_subrank(self) -> int | None:
-        return (
-            self.ranked_badge_level % 10
-            if self.ranked_badge_level is not None
-            else None
-        )
+        return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
 @router.get(
@@ -748,9 +707,7 @@ def get_leaderboard_by_region(
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
 ) -> list[PlayerLeaderboardV1]:
-    limiter.apply_limits(
-        req, res, "/v1/leaderboard/{region}", [RateLimit(limit=100, period=1)]
-    )
+    limiter.apply_limits(req, res, "/v1/leaderboard/{region}", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, ranked_badge_level
@@ -761,9 +718,7 @@ def get_leaderboard_by_region(
     OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(
-            query, {"start": start - 1, "limit": limit, "region": region}
-        )
+        result = client.execute(query, {"start": start - 1, "limit": limit, "region": region})
     return [
         PlayerLeaderboardV1(
             account_id=r[0],
@@ -811,9 +766,7 @@ class PlayerMMRHistoryEntry(BaseModel):
 def get_player_mmr_history(
     req: Request,
     res: Response,
-    account_id: Annotated[
-        int, Path(description="The account id of the player, it's a SteamID3")
-    ],
+    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ) -> list[PlayerMMRHistoryEntry]:
     limiter.apply_limits(
         req,

@@ -45,15 +45,13 @@ def apply_limits(
     prefix = ip
     if api_key:
         prefix = api_key
-        limits = (
-            get_extra_api_key_limits(api_key, request.url.path) or key_default_limits
-        )
+        limits = get_extra_api_key_limits(api_key, request.url.path) or key_default_limits
     if not limits:
         limits = ip_limits
     increment_key(f"{prefix}:{key}", count)
-    status = [limit_by_key(f"{prefix}:{key}", l) for l in limits]
+    status = [limit_by_key(f"{prefix}:{key}", limit) for limit in limits]
     if global_limits:
-        status += [limit_by_key(key, l) for l in global_limits]
+        status += [limit_by_key(key, limit) for limit in global_limits]
     for s in status:
         LOGGER.info(
             f"count: {s.count}, "
@@ -79,10 +77,7 @@ def get_extra_api_key_limits(api_key: str, path: str) -> list[RateLimit]:
             "SELECT rate_limit, rate_period, path FROM api_key_limits WHERE key = %s AND path = %s",
             (api_key, path),
         )
-        return [
-            RateLimit(limit=r[0], period=r[1].seconds, path=r[2])
-            for r in cursor.fetchall()
-        ]
+        return [RateLimit(limit=r[0], period=r[1].seconds, path=r[2]) for r in cursor.fetchall()]
 
 
 def increment_key(key: str, count: int = 1):
@@ -99,9 +94,7 @@ def increment_key(key: str, count: int = 1):
 def limit_by_key(key: str, rate_limit: RateLimit) -> RateLimitStatus:
     LOGGER.debug(f"Checking rate limit: {key=} {rate_limit=}")
     current_time = float(time.time())
-    result = redis_conn().zrange(
-        key, current_time - rate_limit.period, current_time, byscore=True
-    )
+    result = redis_conn().zrange(key, current_time - rate_limit.period, current_time, byscore=True)
     times = list(map(float, result))
     return RateLimitStatus(
         key=key,
