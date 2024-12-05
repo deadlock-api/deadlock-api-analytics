@@ -1,53 +1,31 @@
-from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL, postgres_conn
+from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.utils import is_internal_api_key
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
+no_key_router = APIRouter(prefix="/v1", tags=["Internal"])
 
 
-@router.get("/recent-matches")
-def get_recent_matches(
-    api_key: APIKey = Depends(utils.get_internal_api_key),
-) -> JSONResponse:
-    print(f"Authenticated with API key: {api_key}")
-    query = """
-    SELECT DISTINCT match_id
-    FROM finished_matches
-    WHERE start_time < now() - INTERVAL '3 hours'
-        AND start_time > now() - INTERVAL '7 days'
-        AND match_id NOT IN (SELECT match_id FROM match_salts)
-    ORDER BY start_time DESC
-    LIMIT %(limit)s
-    """
-    query2 = """
-    WITH (SELECT MIN(match_id) as min_match_id, MAX(match_id) as max_match_id FROM finished_matches WHERE start_time < now() - INTERVAL 2 HOUR AND start_time > now() - INTERVAL 7 DAY) AS match_range
-    SELECT number + match_range.min_match_id as match_id
-    FROM numbers(match_range.max_match_id - match_range.min_match_id + 1)
-    WHERE (number + match_range.min_match_id) NOT IN (SELECT match_id FROM match_salts)
-    ORDER BY match_id
-    LIMIT %(limit)s
-    """
-    batch_size = 10000
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"limit": batch_size})
-        if len(result) < batch_size:
-            result += client.execute(query2, {"limit": batch_size - len(result)})
-    return JSONResponse(content=[{"match_id": r[0]} for r in result])
+@no_key_router.get(
+    "/missing-matches",
+    summary="Get missing matches",
+    description="""
+    Get a list of missing matches that we don't have data for yet.
 
-
-@router.get("/missing-matches")
+    You can use this endpoint to help us collect data by submitting match salts via the POST `/match-salts` endpoint.
+    """,
+)
 def get_missing_matches(
     req: Request, res: Response, limit: Annotated[int, Query(ge=1, le=100)] = 100
 ) -> JSONResponse:
@@ -80,7 +58,21 @@ class MatchSalts(BaseModel):
     username: str | None = Field(None)
 
 
-@router.post("/match-salts")
+@no_key_router.post(
+    "/match-salts",
+    summary="Ingest match salts into the database",
+    description="""
+    You can use this endpoint to help us collecting data.
+
+    The endpoint accepts a list of MatchSalts objects, which contain the following fields:
+
+    - `match_id`: The match ID
+    - `cluster_id`: The cluster ID
+    - `metadata_salt`: The metadata salt
+    - `replay_salt`: The replay salt
+    - `username`: The username of the person who submitted the match
+    """,
+)
 def post_match_salts(
     req: Request,
     match_salts: list[MatchSalts] | MatchSalts,
@@ -118,67 +110,97 @@ def post_match_salts(
     return JSONResponse(content={"success": True})
 
 
-class Bundle(BaseModel):
-    path: str
-    manifest_path: str
-    match_ids: list[int]
-    created_at: datetime | None = Field(None)
-
-    @field_validator("created_at", mode="before")
-    @classmethod
-    def utc_created_at(cls, v: datetime | None = None) -> datetime | None:
-        if v is None:
-            return None
-        return v.astimezone(timezone.utc)
-
-
-@router.post("/bundles")
-def post_bundle(
-    bundle: Bundle, api_key: APIKey = Depends(utils.get_internal_api_key)
+@router.get("/recent-matches")
+def get_recent_matches(
+    api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> JSONResponse:
     print(f"Authenticated with API key: {api_key}")
-    with postgres_conn().cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO match_bundle (match_ids, path, manifest_path, created_at)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (bundle.match_ids, bundle.path, bundle.manifest_path, bundle.created_at),
-        )
-        cursor.execute("COMMIT")
-    return JSONResponse(content={"success": True})
-
-
-@router.get("/matches-to-bundle")
-def get_matches_to_bundle(
-    min_unix_timestamp: Annotated[int, Query(ge=0)],
-    max_unix_timestamp: int,
-    api_key: APIKey = Depends(utils.get_internal_api_key),
-    limit: int | None = None,
-) -> list[int]:
-    print(f"Authenticated with API key: {api_key}")
-    if max_unix_timestamp < min_unix_timestamp:
-        raise HTTPException(
-            status_code=400,
-            detail="max_unix_timestamp must be greater than or equal to min_unix_timestamp",
-        )
-    if max_unix_timestamp > (datetime.now() - timedelta(days=1)).timestamp():
-        raise HTTPException(
-            status_code=400, detail="max_unix_timestamp must be at least 24 hours ago"
-        )
+    query = """
+    SELECT DISTINCT match_id
+    FROM finished_matches
+    WHERE start_time < now() - INTERVAL '3 hours'
+        AND start_time > now() - INTERVAL '7 days'
+        AND match_id NOT IN (SELECT match_id FROM match_salts)
+    ORDER BY start_time DESC
+    LIMIT %(limit)s
+    """
+    query2 = """
+    WITH (SELECT MIN(match_id) as min_match_id, MAX(match_id) as max_match_id FROM finished_matches WHERE start_time < now() - INTERVAL 2 HOUR AND start_time > now() - INTERVAL 7 DAY) AS match_range
+    SELECT number + match_range.min_match_id as match_id
+    FROM numbers(match_range.max_match_id - match_range.min_match_id + 1)
+    WHERE (number + match_range.min_match_id) NOT IN (SELECT match_id FROM match_salts)
+    ORDER BY match_id
+    LIMIT %(limit)s
+    """
+    batch_size = 10000
     with CH_POOL.get_client() as client:
-        all_match_ids = client.execute(
-            "SELECT DISTINCT match_id FROM match_info WHERE start_time < now() - INTERVAL 1 DAY AND start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s) AND match_mode IN ('Ranked', 'Unranked') AND match_outcome = 'TeamWin'",
-            {
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-            },
-        )
-    all_match_ids = {r[0] for r in all_match_ids}
-    with postgres_conn().cursor() as cursor:
-        cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
-        bundled_match_ids = {r[0] for r in cursor.fetchall()}
-    match_ids = sorted(list(all_match_ids - bundled_match_ids))
-    if limit:
-        match_ids = match_ids[:limit]
-    return match_ids
+        result = client.execute(query, {"limit": batch_size})
+        if len(result) < batch_size:
+            result += client.execute(query2, {"limit": batch_size - len(result)})
+    return JSONResponse(content=[{"match_id": r[0]} for r in result])
+
+
+# class Bundle(BaseModel):
+#     path: str
+#     manifest_path: str
+#     match_ids: list[int]
+#     created_at: datetime | None = Field(None)
+#
+#     @field_validator("created_at", mode="before")
+#     @classmethod
+#     def utc_created_at(cls, v: datetime | None = None) -> datetime | None:
+#         if v is None:
+#             return None
+#         return v.astimezone(timezone.utc)
+#
+#
+# @router.post("/bundles")
+# def post_bundle(
+#     bundle: Bundle, api_key: APIKey = Depends(utils.get_internal_api_key)
+# ) -> JSONResponse:
+#     print(f"Authenticated with API key: {api_key}")
+#     with postgres_conn().cursor() as cursor:
+#         cursor.execute(
+#             """
+#             INSERT INTO match_bundle (match_ids, path, manifest_path, created_at)
+#             VALUES (%s, %s, %s, %s)
+#             """,
+#             (bundle.match_ids, bundle.path, bundle.manifest_path, bundle.created_at),
+#         )
+#         cursor.execute("COMMIT")
+#     return JSONResponse(content={"success": True})
+#
+#
+# @router.get("/matches-to-bundle")
+# def get_matches_to_bundle(
+#     min_unix_timestamp: Annotated[int, Query(ge=0)],
+#     max_unix_timestamp: int,
+#     api_key: APIKey = Depends(utils.get_internal_api_key),
+#     limit: int | None = None,
+# ) -> list[int]:
+#     print(f"Authenticated with API key: {api_key}")
+#     if max_unix_timestamp < min_unix_timestamp:
+#         raise HTTPException(
+#             status_code=400,
+#             detail="max_unix_timestamp must be greater than or equal to min_unix_timestamp",
+#         )
+#     if max_unix_timestamp > (datetime.now() - timedelta(days=1)).timestamp():
+#         raise HTTPException(
+#             status_code=400, detail="max_unix_timestamp must be at least 24 hours ago"
+#         )
+#     with CH_POOL.get_client() as client:
+#         all_match_ids = client.execute(
+#             "SELECT DISTINCT match_id FROM match_info WHERE start_time < now() - INTERVAL 1 DAY AND start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s) AND match_mode IN ('Ranked', 'Unranked') AND match_outcome = 'TeamWin'",
+#             {
+#                 "min_unix_timestamp": min_unix_timestamp,
+#                 "max_unix_timestamp": max_unix_timestamp,
+#             },
+#         )
+#     all_match_ids = {r[0] for r in all_match_ids}
+#     with postgres_conn().cursor() as cursor:
+#         cursor.execute("SELECT DISTINCT unnest(match_ids) FROM match_bundle")
+#         bundled_match_ids = {r[0] for r in cursor.fetchall()}
+#     match_ids = sorted(list(all_match_ids - bundled_match_ids))
+#     if limit:
+#         match_ids = match_ids[:limit]
+#     return match_ids
