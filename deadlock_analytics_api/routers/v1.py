@@ -331,6 +331,7 @@ def match_search(
     FROM match_info
     WHERE TRUE
     AND match_outcome = 'TeamWin'
+    AND match_mode IN ('Ranked', 'Unranked')
     AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
