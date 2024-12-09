@@ -299,6 +299,119 @@ def match_search_ids(
     return RedirectResponse(url=url, status_code=HTTP_301_MOVED_PERMANENTLY)
 
 
+MATCH_INFO_FIELDS = [
+    "match_id",
+    "start_time",
+    "winning_team",
+    "duration_s",
+    "match_outcome",
+    "match_mode",
+    "game_mode",
+    "sample_time_s",
+    "stat_type",
+    "source_name",
+    "objectives_mask_team0",
+    "objectives_mask_team1",
+    "objectives.destroyed_time_s",
+    "objectives.creep_damage",
+    "objectives.creep_damage_mitigated",
+    "objectives.player_damage",
+    "objectives.player_damage_mitigated",
+    "objectives.first_damage_time_s",
+    "objectives.team_objective",
+    "objectives.team",
+    "mid_boss.team_killed",
+    "mid_boss.team_claimed",
+    "mid_boss.destroyed_time_s",
+    "is_high_skill_range_parties",
+    "low_pri_pool",
+    "new_player_pool",
+    "average_badge_team0",
+    "average_badge_team1",
+    "created_at",
+]
+match_fields_markdown_list = "\n".join(f"- {f}" for f in MATCH_INFO_FIELDS)
+
+MATCH_PLAYER_FIELDS = [
+    "account_id",
+    "player_slot",
+    "team",
+    "kills",
+    "deaths",
+    "assists",
+    "net_worth",
+    "hero_id",
+    "last_hits",
+    "denies",
+    "ability_points",
+    "party",
+    "assigned_lane",
+    "player_level",
+    "abandon_match_time_s",
+    "ability_stats",
+    "stats_type_stat",
+    "book_reward.book_id",
+    "book_reward.xp_amount",
+    "book_reward.starting_xp",
+    "death_details.game_time_s",
+    "death_details.killer_player_slot",
+    "death_details.death_pos",
+    "death_details.killer_pos",
+    "death_details.death_duration_s",
+    "items.game_time_s",
+    "items.item_id",
+    "items.upgrade_id",
+    "items.sold_time_s",
+    "items.flags",
+    "items.imbued_ability_id",
+    "stats.time_stamp_s",
+    "stats.net_worth",
+    "stats.gold_player",
+    "stats.gold_player_orbs",
+    "stats.gold_lane_creep_orbs",
+    "stats.gold_neutral_creep_orbs",
+    "stats.gold_boss",
+    "stats.gold_boss_orb",
+    "stats.gold_treasure",
+    "stats.gold_denied",
+    "stats.gold_death_loss",
+    "stats.gold_lane_creep",
+    "stats.gold_neutral_creep",
+    "stats.kills",
+    "stats.deaths",
+    "stats.assists",
+    "stats.creep_kills",
+    "stats.neutral_kills",
+    "stats.possible_creeps",
+    "stats.creep_damage",
+    "stats.player_damage",
+    "stats.neutral_damage",
+    "stats.boss_damage",
+    "stats.denies",
+    "stats.player_healing",
+    "stats.ability_points",
+    "stats.self_healing",
+    "stats.player_damage_taken",
+    "stats.max_health",
+    "stats.weapon_power",
+    "stats.tech_power",
+    "stats.shots_hit",
+    "stats.shots_missed",
+    "stats.damage_absorbed",
+    "stats.absorption_provided",
+    "stats.hero_bullets_hit",
+    "stats.hero_bullets_hit_crit",
+    "stats.heal_prevented",
+    "stats.heal_lost",
+    "stats.damage_mitigated",
+    "stats.level",
+    "ranked_badge_level",
+    "ranked_badge_detail",
+    "won",
+]
+match_player_fields_markdown_list = "\n".join(f"- {f}" for f in MATCH_PLAYER_FIELDS)
+
+
 @router.get(
     "/matches/search",
     summary="RateLimit: 100req/s",
@@ -308,124 +421,12 @@ def match_search(
     res: Response,
     match_info_return_fields: Annotated[
         str | None,
-        Query(
-            description="""
-Possible fields:
-
-- match_id
-- start_time
-- winning_team
-- duration_s
-- match_outcome
-- match_mode
-- game_mode
-- sample_time_s
-- stat_type
-- source_name
-- objectives_mask_team0
-- objectives_mask_team1
-- objectives.destroyed_time_s
-- objectives.creep_damage
-- objectives.creep_damage_mitigated
-- objectives.player_damage
-- objectives.player_damage_mitigated
-- objectives.first_damage_time_s
-- objectives.team_objective
-- objectives.team
-- mid_boss.team_killed
-- mid_boss.team_claimed
-- mid_boss.destroyed_time_s
-- is_high_skill_range_parties
-- low_pri_pool
-- new_player_pool
-- average_badge_team0
-- average_badge_team1
-- created_at
-        """
-        ),
+        Query(description=f"Possible fields:\n{match_fields_markdown_list}"),
     ] = "match_id,start_time,duration_s,match_mode,game_mode",
     match_player_return_fields: Annotated[
         str | None,
         Query(
-            description="""
-Possible fields:
-
-- account_id
-- player_slot
-- team
-- kills
-- deaths
-- assists
-- net_worth
-- hero_id
-- last_hits
-- denies
-- ability_points
-- party
-- assigned_lane
-- player_level
-- abandon_match_time_s
-- ability_stats
-- stats_type_stat
-- book_reward.book_id
-- book_reward.xp_amount
-- book_reward.starting_xp
-- death_details.game_time_s
-- death_details.killer_player_slot
-- death_details.death_pos
-- death_details.killer_pos
-- death_details.death_duration_s
-- items.game_time_s
-- items.item_id
-- items.upgrade_id
-- items.sold_time_s
-- items.flags
-- items.imbued_ability_id
-- stats.time_stamp_s
-- stats.net_worth
-- stats.gold_player
-- stats.gold_player_orbs
-- stats.gold_lane_creep_orbs
-- stats.gold_neutral_creep_orbs
-- stats.gold_boss
-- stats.gold_boss_orb
-- stats.gold_treasure
-- stats.gold_denied
-- stats.gold_death_loss
-- stats.gold_lane_creep
-- stats.gold_neutral_creep
-- stats.kills
-- stats.deaths
-- stats.assists
-- stats.creep_kills
-- stats.neutral_kills
-- stats.possible_creeps
-- stats.creep_damage
-- stats.player_damage
-- stats.neutral_damage
-- stats.boss_damage
-- stats.denies
-- stats.player_healing
-- stats.ability_points
-- stats.self_healing
-- stats.player_damage_taken
-- stats.max_health
-- stats.weapon_power
-- stats.tech_power
-- stats.shots_hit
-- stats.shots_missed
-- stats.damage_absorbed
-- stats.absorption_provided
-- stats.hero_bullets_hit
-- stats.hero_bullets_hit_crit
-- stats.heal_prevented
-- stats.heal_lost
-- stats.damage_mitigated
-- stats.level
-- ranked_badge_level
-- ranked_badge_detail
-- won
-        """
+            description=f"Possible fields:\n{match_player_fields_markdown_list}",
         ),
     ] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
@@ -453,12 +454,12 @@ Possible fields:
         for m in [
             f"any(mi.{f}) as {f}"
             for f in (match_info_return_fields or "").split(",")
-            if f != "match_id" and len(f) > 0
+            if f != "match_id" and len(f) > 0 and f in MATCH_INFO_FIELDS
         ]
         + [
             f"groupArray(mp.{f}) as players_{f.replace('.','_')}"
             for f in (match_player_return_fields or "").split(",")
-            if f != "match_id" and len(f) > 0
+            if f != "match_id" and len(f) > 0 and f in MATCH_PLAYER_FIELDS
         ]
     )
     query = f"""
