@@ -306,6 +306,129 @@ def match_search_ids(
 def match_search(
     req: Request,
     res: Response,
+    match_info_return_fields: Annotated[
+        str | None,
+        Query(
+            description="""
+Possible fields:
+
+- match_id
+- start_time
+- winning_team
+- duration_s
+- match_outcome
+- match_mode
+- game_mode
+- sample_time_s
+- stat_type
+- source_name
+- objectives_mask_team0
+- objectives_mask_team1
+- objectives.destroyed_time_s
+- objectives.creep_damage
+- objectives.creep_damage_mitigated
+- objectives.player_damage
+- objectives.player_damage_mitigated
+- objectives.first_damage_time_s
+- objectives.team_objective
+- objectives.team
+- mid_boss.team_killed
+- mid_boss.team_claimed
+- mid_boss.destroyed_time_s
+- is_high_skill_range_parties
+- low_pri_pool
+- new_player_pool
+- average_badge_team0
+- average_badge_team1
+- created_at
+        """
+        ),
+    ] = "match_id,start_time,duration_s,match_mode,game_mode",
+    match_player_return_fields: Annotated[
+        str | None,
+        Query(
+            description="""
+Possible fields:
+
+- match_id
+- account_id
+- player_slot
+- team
+- kills
+- deaths
+- assists
+- net_worth
+- hero_id
+- last_hits
+- denies
+- ability_points
+- party
+- assigned_lane
+- player_level
+- abandon_match_time_s
+- ability_stats
+- stats_type_stat
+- book_reward.book_id
+- book_reward.xp_amount
+- book_reward.starting_xp
+- death_details.game_time_s
+- death_details.killer_player_slot
+- death_details.death_pos
+- death_details.killer_pos
+- death_details.death_duration_s
+- items.game_time_s
+- items.item_id
+- items.upgrade_id
+- items.sold_time_s
+- items.flags
+- items.imbued_ability_id
+- stats.time_stamp_s
+- stats.net_worth
+- stats.gold_player
+- stats.gold_player_orbs
+- stats.gold_lane_creep_orbs
+- stats.gold_neutral_creep_orbs
+- stats.gold_boss
+- stats.gold_boss_orb
+- stats.gold_treasure
+- stats.gold_denied
+- stats.gold_death_loss
+- stats.gold_lane_creep
+- stats.gold_neutral_creep
+- stats.kills
+- stats.deaths
+- stats.assists
+- stats.creep_kills
+- stats.neutral_kills
+- stats.possible_creeps
+- stats.creep_damage
+- stats.player_damage
+- stats.neutral_damage
+- stats.boss_damage
+- stats.denies
+- stats.player_healing
+- stats.ability_points
+- stats.self_healing
+- stats.player_damage_taken
+- stats.max_health
+- stats.weapon_power
+- stats.tech_power
+- stats.shots_hit
+- stats.shots_missed
+- stats.damage_absorbed
+- stats.absorption_provided
+- stats.hero_bullets_hit
+- stats.hero_bullets_hit_crit
+- stats.heal_prevented
+- stats.heal_lost
+- stats.damage_mitigated
+- stats.level
+- ranked_badge_level
+- ranked_badge_detail
+- won
+        """
+        ),
+    ] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -319,36 +442,51 @@ def match_search(
     is_low_pri_pool: bool | None = None,
     is_new_player_pool: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=100000)] = 1000,
-) -> list[MatchSearchResult]:
+) -> list[dict]:
     limiter.apply_limits(
         req,
         res,
         "/v1/matches/search",
         [RateLimit(limit=100, period=1)],
     )
-    query = """
-    SELECT DISTINCT ON(match_id) match_id, start_time, duration_s, match_mode, game_mode
-    FROM match_info
+    select_list = ", ".join(
+        m
+        for m in [
+            f"any(mi.{f}) as {f}"
+            for f in (match_info_return_fields or "").split(",")
+            if f != "match_id" and len(f) > 0
+        ]
+        + [
+            f"groupArray(mp.{f}) as players_{f.replace('.','_')}"
+            for f in (match_player_return_fields or "").split(",")
+            if f != "match_id" and len(f) > 0
+        ]
+    )
+    query = f"""
+    SELECT match_id, {select_list}
+    FROM match_player mp
+    INNER JOIN match_info mi USING match_id
     WHERE TRUE
-    AND match_outcome = 'TeamWin'
-    AND match_mode IN ('Ranked', 'Unranked')
-    AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-    AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-    AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-    AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-    AND (%(min_duration_s)s IS NULL OR duration_s >= %(min_duration_s)s)
-    AND (%(max_duration_s)s IS NULL OR duration_s <= %(max_duration_s)s)
-    AND (%(min_average_badge)s IS NULL OR least(average_badge_team0, average_badge_team1) >= %(min_average_badge)s)
-    AND (%(max_average_badge)s IS NULL OR greatest(average_badge_team0, average_badge_team1) <= %(max_average_badge)s)
-    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
-    AND (%(is_high_skill_range_party)s IS NULL OR is_high_skill_range_parties = %(is_high_skill_range_party)s)
-    AND (%(is_low_pri_pool)s IS NULL OR low_pri_pool = %(is_low_pri_pool)s)
-    AND (%(is_new_player_pool)s IS NULL OR new_player_pool = %(is_new_player_pool)s)
+    AND mi.match_outcome = 'TeamWin'
+    AND mi.match_mode IN ('Ranked', 'Unranked')
+    AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
+    AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
+    AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
+    AND (%(min_average_badge)s IS NULL OR least(mi.average_badge_team0, mi.average_badge_team1) >= %(min_average_badge)s)
+    AND (%(max_average_badge)s IS NULL OR greatest(mi.average_badge_team0, mi.average_badge_team1) <= %(max_average_badge)s)
+    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+    AND (%(is_high_skill_range_party)s IS NULL OR mi.is_high_skill_range_parties = %(is_high_skill_range_party)s)
+    AND (%(is_low_pri_pool)s IS NULL OR mi.low_pri_pool = %(is_low_pri_pool)s)
+    AND (%(is_new_player_pool)s IS NULL OR mi.new_player_pool = %(is_new_player_pool)s)
+    GROUP BY match_id
     ORDER BY match_id
     LIMIT %(limit)s
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(
+        results, keys = client.execute(
             query,
             {
                 "min_unix_timestamp": min_unix_timestamp,
@@ -365,16 +503,14 @@ def match_search(
                 "is_new_player_pool": is_new_player_pool,
                 "limit": limit,
             },
+            with_column_types=True,
         )
     return [
-        MatchSearchResult(
-            match_id=r[0],
-            start_time=r[1],
-            duration_s=r[2],
-            match_mode=r[3],
-            game_mode=r[4],
-        )
-        for r in result
+        {
+            k: r if not isinstance(r, datetime) else r.astimezone(timezone.utc)
+            for (k, _), r in zip(keys, result)
+        }
+        for result in results
     ]
 
 
