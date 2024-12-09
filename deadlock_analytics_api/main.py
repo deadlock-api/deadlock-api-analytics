@@ -10,6 +10,7 @@ from starlette.responses import FileResponse, RedirectResponse
 from deadlock_analytics_api.routers import internal, v1, v2
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 if "SENTRY_DSN" in os.environ:
     import sentry_sdk
