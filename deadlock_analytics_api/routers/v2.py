@@ -722,7 +722,17 @@ def get_player_mmr_history(
 
 @router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
 def get_matches_by_account_id(
-    req: Request, res: Response, account_id: int, has_metadata: bool | None = None
+    req: Request,
+    res: Response,
+    account_id: int,
+    has_metadata: bool | None = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[dict]:
     limiter.apply_limits(
         req,
@@ -740,12 +750,29 @@ def get_matches_by_account_id(
     AND mi.match_outcome = 'TeamWin'
     AND mi.match_mode IN ('Ranked', 'Unranked')
     AND (%(has_metadata)s IS NULL OR toBool(mi.match_id > 0) = %(has_metadata)s)
+    AND (%(min_unix_timestamp)s IS NULL OR pmh.start_time >= toDateTime(%(min_unix_timestamp)s))
+    AND (%(max_unix_timestamp)s IS NULL OR pmh.start_time <= toDateTime(%(max_unix_timestamp)s))
+    AND (%(min_match_id)s IS NULL OR pmh.match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR pmh.match_id <= %(max_match_id)s)
+    AND (%(min_duration_s)s IS NULL OR pmh.match_duration_s >= %(min_duration_s)s)
+    AND (%(max_duration_s)s IS NULL OR pmh.match_duration_s <= %(max_duration_s)s)
+    AND (%(match_mode)s IS NULL OR pmh.match_mode = %(match_mode)s)
     ORDER BY match_id DESC
     """
     with CH_POOL.get_client() as client:
         entries, keys = client.execute(
             query,
-            {"account_id": account_id, "has_metadata": has_metadata},
+            {
+                "account_id": account_id,
+                "has_metadata": has_metadata,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+                "match_mode": match_mode,
+            },
             with_column_types=True,
         )
     if len(entries) == 0:
