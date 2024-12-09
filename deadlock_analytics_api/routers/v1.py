@@ -350,7 +350,6 @@ Possible fields:
             description="""
 Possible fields:
 
-- match_id
 - account_id
 - player_slot
 - team
