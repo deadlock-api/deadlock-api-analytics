@@ -36,10 +36,10 @@ class ItemWinLossStat(BaseModel):
 
 
 class PlayerCardSlot(BaseModel):
-    slots_id: int
-    hero_id: int
-    hero_kills: int
-    hero_wins: int
+    slots_id: int | None
+    hero_id: int | None
+    hero_kills: int | None
+    hero_wins: int | None
     # stat_id: int # Always 0
     # stat_score: int # Always 0
 
@@ -61,7 +61,9 @@ class PlayerCardHistoryEntry(BaseModel):
             slots=[
                 PlayerCardSlot(
                     **{
-                        k.replace("slots_", "", 1): v[0] if isinstance(v, list) else v
+                        k.replace("slots_", "", 1): (v[0] if len(v) > 0 else None)
+                        if isinstance(v, list)
+                        else v
                         for k, v in row.items()
                         if k.startswith("slots_")
                     }
