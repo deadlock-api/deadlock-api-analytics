@@ -945,6 +945,7 @@ def get_player_mmr_history(
         for r in result
     ]
 
+
 class ItemWinRateEntry(BaseModel):
     item_id: int
     total: int
@@ -955,8 +956,16 @@ class ItemWinRateEntry(BaseModel):
     def win_rate(self) -> float:
         return round(self.wins / self.total, 2)
 
+
 @router.get("/dev/win-rate-analysis", summary="Rate Limit 10req/min | API-Key Rate Limit 10req/min")
-def get_win_rate_analysis(req: Request, res: Response, hero_id: int, excluded_item_ids: list[int] = [], required_item_ids: list[int] = [], min_badge_level: int = 80) -> list[ItemWinRateEntry]:
+def get_win_rate_analysis(
+    req: Request,
+    res: Response,
+    hero_id: int,
+    excluded_item_ids: list[int] = [],
+    required_item_ids: list[int] = [],
+    min_badge_level: int = 80,
+) -> list[ItemWinRateEntry]:
     limiter.apply_limits(
         req,
         res,
@@ -971,6 +980,7 @@ def get_win_rate_analysis(req: Request, res: Response, hero_id: int, excluded_it
 
             def clean(query: str, params: dict):
                 return client.substitute_params(query, params, client.connection.context)
+
             # Build the exclusion/requirement conditions
             exclude_conditions = [
                 clean(
@@ -1026,11 +1036,17 @@ def get_win_rate_analysis(req: Request, res: Response, hero_id: int, excluded_it
             SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 10
             """
 
-            result = client.execute(query, {"hero_id": hero_id, "min_badge_level": min_badge_level, "start_time": START_TIME})
+            result = client.execute(
+                query,
+                {"hero_id": hero_id, "min_badge_level": min_badge_level, "start_time": START_TIME},
+            )
 
             # For now only return the items that are the same
-            return [ItemWinRateEntry(item_id=r[1], total=r[3], wins=r[4]) for r in result if r[3] > 10 and r[1] == r[2]]
+            return [
+                ItemWinRateEntry(item_id=r[1], total=r[3], wins=r[4])
+                for r in result
+                if r[3] > 10 and r[1] == r[2]
+            ]
     except Exception as e:
         print("Error in get_win_rate_analysis", e)
         raise HTTPException(status_code=500, detail="Internal server error")
-
