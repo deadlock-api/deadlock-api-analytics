@@ -957,8 +957,8 @@ class ItemWinRateEntry(BaseModel):
         return round(self.wins / self.total, 2)
 
 
-@router.get("/dev/win-rate-analysis", summary="Rate Limit 10req/min | API-Key Rate Limit 10req/min")
-def get_win_rate_analysis(
+@router.post("/dev/win-rate-analysis", summary="Rate Limit 10req/min | API-Key Rate Limit 10req/min")
+def post_win_rate_analysis(
     req: Request,
     res: Response,
     hero_id: int,
