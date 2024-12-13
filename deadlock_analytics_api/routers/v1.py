@@ -957,7 +957,9 @@ class ItemWinRateEntry(BaseModel):
         return round(self.wins / self.total, 2)
 
 
-@router.post("/dev/win-rate-analysis", summary="Rate Limit 10req/min | API-Key Rate Limit 10req/min")
+@router.post(
+    "/dev/win-rate-analysis", summary="Rate Limit 10req/min | API-Key Rate Limit 10req/min"
+)
 def post_win_rate_analysis(
     req: Request,
     res: Response,
@@ -1013,6 +1015,7 @@ def post_win_rate_analysis(
                 JOIN match_info mi ON mi.match_id = mp.match_id
                 WHERE
                     mp.match_id > min_id AND
+                    mi.match_mode IN ('Ranked', 'Unranked') AND
                     mp.hero_id = %(hero_id)s AND
                     (mi.average_badge_team0 > %(min_badge_level)s OR mi.average_badge_team1 > %(min_badge_level)s)
                     {additional_conditions}
