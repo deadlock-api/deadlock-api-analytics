@@ -1017,7 +1017,7 @@ def post_win_rate_analysis(
                     mp.match_id > min_id AND
                     mi.match_mode IN ('Ranked', 'Unranked') AND
                     mp.hero_id = %(hero_id)s AND
-                    (mi.average_badge_team0 > %(min_badge_level)s OR mi.average_badge_team1 > %(min_badge_level)s)
+                    (mi.average_badge_team0 > %(min_badge_level)s AND mi.average_badge_team1 > %(min_badge_level)s)
                     {additional_conditions}
             ),
             valid_mpi AS (
@@ -1029,26 +1029,24 @@ def post_win_rate_analysis(
             SELECT
                 hero_id,
                 mpi.item_id AS item_id_1,
-                mpi2.item_id AS item_id_2,
                 COUNT() AS total,
                 countIf(won = true) AS wins
             FROM valid_mpi mpi
-            INNER JOIN valid_mpi mpi2 ON mpi.match_id = mpi2.match_id
-            WHERE mpi.hero_id = %(hero_id)s AND mpi2.hero_id = %(hero_id)s
-            GROUP BY hero_id, mpi.item_id, mpi2.item_id
+            WHERE mpi.hero_id = %(hero_id)s
+            GROUP BY hero_id, mpi.item_id
             SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 10
             """
 
-            result = client.execute(
+            _hero_id, item_id, total, wins = result = client.execute(
                 query,
                 {"hero_id": hero_id, "min_badge_level": min_badge_level, "start_time": START_TIME},
             )
 
             # For now only return the items that are the same
             return [
-                ItemWinRateEntry(item_id=r[1], total=r[3], wins=r[4])
+                ItemWinRateEntry(item_id=item_id, total=total, wins=wins)
                 for r in result
-                if r[3] > 10 and r[1] == r[2]
+                if total > 5
             ]
     except Exception as e:
         print("Error in get_win_rate_analysis", e)
