@@ -1037,17 +1037,18 @@ def post_win_rate_analysis(
             SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 10
             """
 
-            _hero_id, item_id, total, wins = result = client.execute(
+            result = client.execute(
                 query,
                 {"hero_id": hero_id, "min_badge_level": min_badge_level, "start_time": START_TIME},
             )
 
+            entries = []
+            for _hero_id, item_id, total, wins in result:
+                if total > 5:
+                    entries.append(ItemWinRateEntry(item_id=item_id, total=total, wins=wins))
+
             # For now only return the items that are the same
-            return [
-                ItemWinRateEntry(item_id=item_id, total=total, wins=wins)
-                for r in result
-                if total > 5
-            ]
+            return entries
     except Exception as e:
         print("Error in get_win_rate_analysis", e)
         raise HTTPException(status_code=500, detail="Internal server error")
