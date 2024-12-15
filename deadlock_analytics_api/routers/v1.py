@@ -1048,7 +1048,9 @@ def post_win_rate_analysis(
             for _hero_id, item_id, total, wins, unique_users in result:
                 if total > 5:
                     entries.append(
-                        ItemWinRateEntry(item_id=item_id, total=total, wins=wins, unique_users=unique_users)
+                        ItemWinRateEntry(
+                            item_id=item_id, total=total, wins=wins, unique_users=unique_users
+                        )
                     )
 
             # For now only return the items that are the same
