@@ -11,7 +11,7 @@ dependencies = [
     "cachetools>=5.5.0",
     "clickhouse-pool>=0.6.0",
     "fastapi>=0.115.5",
-    "granian>=1.6.4",
+    "granian<1.7.0",
     "prometheus-fastapi-instrumentator>=7.0.0",
     "psycopg2-binary>=2.9.10",
     "redis[hiredis]>=5.2.0",

@@ -167,7 +167,7 @@ requires-dist = [
     { name = "cachetools", specifier = ">=5.5.0" },
     { name = "clickhouse-pool", specifier = ">=0.6.0" },
     { name = "fastapi", specifier = ">=0.115.5" },
-    { name = "granian", specifier = ">=1.6.4" },
+    { name = "granian", specifier = "<1.7.0" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "redis", extras = ["hiredis"], specifier = ">=5.2.0" },
