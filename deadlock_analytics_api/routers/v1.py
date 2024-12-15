@@ -950,6 +950,7 @@ class ItemWinRateEntry(BaseModel):
     item_id: int
     total: int
     wins: int
+    unique_users: int
 
     @computed_field
     @property
@@ -1010,7 +1011,7 @@ def post_win_rate_analysis(
                 WHERE mi.start_time > toDateTime(%(start_time)s)
             ) AS min_id,
             valid_matches AS (
-                SELECT DISTINCT match_id
+                SELECT DISTINCT match_id, mp.account_id AS account_id
                 FROM match_player mp
                 JOIN match_info mi ON mi.match_id = mp.match_id
                 WHERE
@@ -1021,7 +1022,7 @@ def post_win_rate_analysis(
                     {additional_conditions}
             ),
             valid_mpi AS (
-                SELECT *
+                SELECT *, vm.account_id AS account_id
                 FROM match_player_item mpi
                 JOIN valid_matches vm ON mpi.match_id = vm.match_id
                 WHERE mpi.match_id > min_id
@@ -1030,7 +1031,8 @@ def post_win_rate_analysis(
                 hero_id,
                 mpi.item_id AS item_id_1,
                 COUNT() AS total,
-                countIf(won = true) AS wins
+                countIf(won = true) AS wins,
+                count(DISTINCT account_id) AS unique_users
             FROM valid_mpi mpi
             WHERE mpi.hero_id = %(hero_id)s
             GROUP BY hero_id, mpi.item_id
@@ -1043,9 +1045,11 @@ def post_win_rate_analysis(
             )
 
             entries = []
-            for _hero_id, item_id, total, wins in result:
+            for _hero_id, item_id, total, wins, unique_users in result:
                 if total > 5:
-                    entries.append(ItemWinRateEntry(item_id=item_id, total=total, wins=wins))
+                    entries.append(
+                        ItemWinRateEntry(item_id=item_id, total=total, wins=wins, unique_users=unique_users)
+                    )
 
             # For now only return the items that are the same
             return entries
