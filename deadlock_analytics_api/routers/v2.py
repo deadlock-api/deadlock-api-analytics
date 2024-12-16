@@ -181,13 +181,16 @@ def get_hero_win_loss_stats(
                 "max_hero_matches": max_hero_matches_per_player,
             },
         )
-    return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+    return [
+        HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2], matches=r[1] + r[2]) for r in result
+    ]
 
 
 class HeroCombsWinLossStat(BaseModel):
     hero_ids: list[int]
     wins: int
     losses: int
+    matches: int
 
 
 @router.get("/hero-combs-win-loss-stats", summary="RateLimit: 100req/s")
@@ -284,7 +287,7 @@ def get_hero_combs_win_loss_stats(
         )
     if comb_size == 6:
         comb_stats = [
-            HeroCombsWinLossStat(hero_ids=heroes, wins=wins, losses=losses)
+            HeroCombsWinLossStat(hero_ids=heroes, wins=wins, losses=losses, matches=wins + losses)
             for heroes, wins, losses in result
             if min_total_matches is None or wins + losses >= min_total_matches
         ]
@@ -298,7 +301,9 @@ def get_hero_combs_win_loss_stats(
                 comb_stats[hero_comb][1] += losses
 
         comb_stats = [
-            HeroCombsWinLossStat(hero_ids=list(heroes), wins=wins, losses=losses)
+            HeroCombsWinLossStat(
+                hero_ids=list(heroes), wins=wins, losses=losses, matches=wins + losses
+            )
             for heroes, (wins, losses) in comb_stats.items()
             if min_total_matches is None or wins + losses >= min_total_matches
         ]

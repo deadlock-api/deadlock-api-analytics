@@ -723,6 +723,7 @@ class HeroWinLossStat(BaseModel):
     hero_id: int
     wins: int
     losses: int
+    matches: int
 
 
 @router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s", deprecated=True)
