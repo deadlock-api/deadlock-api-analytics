@@ -767,7 +767,9 @@ def get_hero_win_loss_stats(
                 "max_unix_timestamp": max_unix_timestamp,
             },
         )
-    return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+    return [
+        HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2], matches=r[1] + r[2]) for r in result
+    ]
 
 
 class PlayerLeaderboardV1(BaseModel):
