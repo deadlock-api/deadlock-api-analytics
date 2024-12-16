@@ -1,9 +1,11 @@
 import itertools
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException, Path, Query
+from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_301_MOVED_PERMANENTLY
@@ -180,6 +182,133 @@ def get_hero_win_loss_stats(
             },
         )
     return [HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2]) for r in result]
+
+
+class HeroCombsWinLossStat(BaseModel):
+    hero_ids: list[int]
+    wins: int
+    losses: int
+
+
+@router.get("/hero-combs-win-loss-stats", summary="RateLimit: 100req/s")
+def get_hero_combs_win_loss_stats(
+    req: Request,
+    res: Response,
+    comb_size: Annotated[int, Query(ge=2, le=6, description="Size of the hero combination")] = 6,
+    include_hero_ids: Annotated[
+        str, Query(description="Comma separated hero ids that must be included")
+    ] = None,
+    exclude_hero_ids: Annotated[
+        str, Query(description="Comma separated hero ids that must be excluded")
+    ] = None,
+    min_total_matches: Annotated[
+        int | None, Query(ge=0, description="Minimum total matches")
+    ] = None,
+    sorted_by: Literal["winrate", "wins", "matches"] | None = None,
+    limit: Annotated[int | None, Query(ge=0)] = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
+) -> list[HeroCombsWinLossStat]:
+    limiter.apply_limits(
+        req, res, "/v2/hero-combs-win-loss-stats", [RateLimit(limit=100, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
+
+    # validate include_hero_ids and exclude_hero_ids
+    include_hero_ids = [
+        int(h.strip()) for h in (include_hero_ids.split(",") if include_hero_ids else [])
+    ]
+    if len(include_hero_ids) > comb_size:
+        raise HTTPException(
+            status_code=400,
+            detail="include_hero_ids can't have more elements than comb_size",
+        )
+    exclude_hero_ids = [
+        int(h.strip()) for h in (exclude_hero_ids.split(",") if exclude_hero_ids else [])
+    ]
+    if (
+        include_hero_ids
+        and exclude_hero_ids
+        and any(h in include_hero_ids for h in exclude_hero_ids)
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="include_hero_ids and exclude_hero_ids can't have common elements",
+        )
+
+    query = """
+    WITH hero_combinations AS (
+        SELECT arraySort(groupUniqArray(6)(hero_id)) AS hero_ids, countIf(won) AS team_wins, countIf(not won) AS team_losses
+        FROM match_player FINAL
+        INNER JOIN match_info mi USING (match_id)
+        INNER JOIN player p USING (account_id)
+        WHERE 1=1
+        AND mi.match_outcome = 'TeamWin'
+        AND mi.match_mode IN ('Ranked', 'Unranked')
+        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
+        GROUP BY match_id, team
+    )
+    SELECT hero_ids, sum(team_wins) / length(hero_ids) AS wins, sum(team_losses) / length(hero_ids) AS losses
+    FROM hero_combinations
+    WHERE 1=1
+    AND length(hero_ids) = 6
+    AND arrayAll(x -> has(hero_ids, x), %(include_hero_ids)s)
+    AND NOT arrayExists(x -> has(hero_ids, x), %(exclude_hero_ids)s)
+    GROUP BY hero_ids
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "match_mode": match_mode,
+                "region": region,
+                "include_hero_ids": include_hero_ids,
+                "exclude_hero_ids": exclude_hero_ids,
+            },
+        )
+    if comb_size == 6:
+        comb_stats = [
+            HeroCombsWinLossStat(hero_ids=heroes, wins=wins, losses=losses)
+            for heroes, wins, losses in result
+            if min_total_matches is None or wins + losses >= min_total_matches
+        ]
+    else:
+        comb_stats = defaultdict(lambda: [0, 0])
+        for [hero_ids, wins, losses] in result:
+            for hero_comb in itertools.combinations(hero_ids, comb_size):
+                if include_hero_ids and not all(h in hero_comb for h in include_hero_ids):
+                    continue
+                comb_stats[hero_comb][0] += wins
+                comb_stats[hero_comb][1] += losses
+
+        comb_stats = [
+            HeroCombsWinLossStat(hero_ids=list(heroes), wins=wins, losses=losses)
+            for heroes, (wins, losses) in comb_stats.items()
+            if min_total_matches is None or wins + losses >= min_total_matches
+        ]
+    match sorted_by:
+        case "winrate":
+            comb_stats.sort(key=lambda x: x.wins / max(1, x.wins + x.losses), reverse=True)
+        case "wins":
+            comb_stats.sort(key=lambda x: x.wins, reverse=True)
+        case "matches":
+            comb_stats.sort(key=lambda x: x.wins + x.losses, reverse=True)
+    if limit is not None:
+        comb_stats = comb_stats[:limit]
+    return comb_stats
 
 
 @router.get("/hero/{hero_id}/item-win-loss-stats", summary="RateLimit: 100req/s")
