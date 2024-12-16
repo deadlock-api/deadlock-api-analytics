@@ -286,8 +286,8 @@ def get_hero_combs_win_loss_stats(
     )
     SELECT
         hero_ids,
-        sum(team_wins) / length(hero_ids) AS wins,
-        sum(team_losses) / length(hero_ids) AS losses,
+        sum(team_wins) / 6 AS wins,
+        sum(team_losses) / 6 AS losses,
         sum(kills) AS total_kills,
         sum(deaths) AS total_deaths,
         sum(assists) AS total_assists
