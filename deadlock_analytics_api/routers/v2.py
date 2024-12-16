@@ -145,8 +145,15 @@ def get_hero_win_loss_stats(
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
     WITH filtered_players AS (
-        SELECT hero_id, account_id, countIf(team == mi.winning_team) AS player_wins, countIf(team != mi.winning_team) AS player_losses
-        FROM match_player
+        SELECT
+            hero_id,
+            account_id,
+            countIf(won) AS player_wins,
+            countIf(not won) AS player_losses,
+            sum(kills) AS kills,
+            sum(deaths) AS deaths,
+            sum(assists) AS assists
+        FROM match_player FINAL
         INNER JOIN match_info mi USING (match_id)
         INNER JOIN player p USING (account_id)
         WHERE 1=1
@@ -433,7 +440,7 @@ def get_player_hero_stats_batch(
             hero_id,
             count(*)                                                                                   AS matches,
             max(ranked_badge_level)                                                                    AS highest_ranked_badge_level,
-            sum(team = mi.winning_team)                                                                AS wins,
+            countIf(won)                                                                               AS wins,
             avg(arrayMax(stats.level))                                                                 AS ending_level,
             sum(kills)                                                                                 AS kills,
             sum(deaths)                                                                                AS deaths,
@@ -647,7 +654,7 @@ def get_player_mate_stats(
     )
     account_id = utils.validate_steam_id(account_id)
     query = """
-    SELECT mate_id, countIf(p.team == mi.winning_team) as wins, COUNT() as matches_played, groupArray(p.match_id) as matches
+    SELECT mate_id, countIf(p.won) as wins, COUNT() as matches_played, groupArray(p.match_id) as matches
     FROM match_parties p
     ARRAY JOIN p.account_ids as mate_id
     INNER JOIN match_info mi USING (match_id)
@@ -713,7 +720,7 @@ def get_player_party_stats(
     query = """
     SELECT
     length(p.account_ids)              as party_size,
-    countIf(p.team == mi.winning_team) as wins,
+    countIf(p.won)                     as wins,
     COUNT()                            as matches_played,
     groupArray(p.match_id)             as matches
     FROM match_parties p
