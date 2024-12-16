@@ -434,21 +434,24 @@ def get_player_hero_stats_batch(
             count(*)                                                                                   AS matches,
             max(ranked_badge_level)                                                                    AS highest_ranked_badge_level,
             sum(team = mi.winning_team)                                                                AS wins,
+            avg(arrayMax(stats.level))                                                                 AS ending_level,
             sum(kills)                                                                                 AS kills,
             sum(deaths)                                                                                AS deaths,
             sum(assists)                                                                               AS assists,
-            avg(arrayMax(stats.level))                                                                 AS ending_level,
             avg(denies)                                                                                AS denies_per_match,
+            60 * avg(mp.kills / duration_s)                                                            AS kills_per_min,
+            60 * avg(mp.deaths / duration_s)                                                           AS deaths_per_min,
+            60 * avg(mp.assists / duration_s)                                                          AS assists_per_min,
+            60 * avg(denies / duration_s)                                                              AS denies_per_min,
             60 * avg(net_worth / duration_s)                                                           AS networth_per_min,
             60 * avg(last_hits / duration_s)                                                           AS last_hits_per_min,
-            60 * avg(denies / duration_s)                                                              AS denies_per_min,
             60 * avg(arrayMax(stats.player_damage) / duration_s)                                       AS damage_mitigated_per_min,
             60 * avg(arrayMax(stats.player_damage_taken) / duration_s)                                 AS damage_taken_per_min,
             60 * avg(arrayMax(stats.creep_kills) / duration_s)                                         AS creeps_per_min,
             60 * avg(arrayMax(stats.neutral_damage) / duration_s)                                      AS obj_damage_per_min,
             avg(arrayMax(stats.shots_hit) / greatest(1, arrayMax(stats.shots_hit) + arrayMax(stats.shots_missed))) AS accuracy,
             avg(arrayMax(stats.hero_bullets_hit_crit) / greatest(1, arrayMax(stats.hero_bullets_hit_crit) + arrayMax(stats.hero_bullets_hit))) AS crit_shot_rate
-        FROM default.match_player
+        FROM match_player mp
         INNER JOIN default.match_info AS mi USING (match_id)
         WHERE account_id IN %(account_ids)s
         AND mi.match_outcome = 'TeamWin'
