@@ -13,7 +13,6 @@ from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
-from deadlock_analytics_api.routers.v1 import HeroWinLossStat
 from deadlock_analytics_api.routers.v2_models import (
     ItemWinLossStat,
     PlayerCardHistoryEntry,
@@ -24,6 +23,7 @@ from deadlock_analytics_api.routers.v2_models import (
     PlayerMMRHistoryEntryV2,
     PlayerParty,
     HeroCombsWinLossStat,
+    HeroWinLossStatV2,
 )
 
 router = APIRouter(prefix="/v2", tags=["V2"])
@@ -140,7 +140,7 @@ def get_hero_win_loss_stats(
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
-) -> list[HeroWinLossStat]:
+) -> list[HeroWinLossStatV2]:
     limiter.apply_limits(req, res, "/v2/hero-win-loss-stats", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = """
@@ -167,7 +167,13 @@ def get_hero_win_loss_stats(
         AND (%(region)s IS NULL OR p.region_mode = %(region)s)
         GROUP BY hero_id, account_id
     )
-    SELECT hero_id, sum(player_wins) AS wins, sum(player_losses) AS losses
+    SELECT
+        hero_id,
+        sum(player_wins) AS wins,
+        sum(player_losses) AS losses,
+        sum(kills) AS total_kills,
+        sum(deaths) AS total_deaths,
+        sum(assists) AS total_assists
     FROM filtered_players
     WHERE (%(min_hero_matches)s IS NULL OR player_wins + player_losses <= %(min_hero_matches)s)
     AND (%(max_hero_matches)s IS NULL OR player_wins + player_losses <= %(max_hero_matches)s)
@@ -189,7 +195,16 @@ def get_hero_win_loss_stats(
             },
         )
     return [
-        HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2], matches=r[1] + r[2]) for r in result
+        HeroWinLossStatV2(
+            hero_id=r[0],
+            wins=r[1],
+            losses=r[2],
+            matches=r[1] + r[2],
+            total_kills=r[3],
+            total_deaths=r[4],
+            total_assists=r[5],
+        )
+        for r in result
     ]
 
 
@@ -248,7 +263,13 @@ def get_hero_combs_win_loss_stats(
 
     query = """
     WITH hero_combinations AS (
-        SELECT arraySort(groupUniqArray(6)(hero_id)) AS hero_ids, countIf(won) AS team_wins, countIf(not won) AS team_losses
+        SELECT
+            arraySort(groupUniqArray(6)(hero_id)) AS hero_ids,
+            countIf(won) AS team_wins,
+            countIf(not won) AS team_losses,
+            sum(kills) AS kills,
+            sum(deaths) AS deaths,
+            sum(assists) AS assists
         FROM match_player FINAL
         INNER JOIN match_info mi USING (match_id)
         INNER JOIN player p USING (account_id)
@@ -263,7 +284,13 @@ def get_hero_combs_win_loss_stats(
         AND (%(region)s IS NULL OR p.region_mode = %(region)s)
         GROUP BY match_id, team
     )
-    SELECT hero_ids, sum(team_wins) / length(hero_ids) AS wins, sum(team_losses) / length(hero_ids) AS losses
+    SELECT
+        hero_ids,
+        sum(team_wins) / length(hero_ids) AS wins,
+        sum(team_losses) / length(hero_ids) AS losses,
+        sum(kills) AS total_kills,
+        sum(deaths) AS total_deaths,
+        sum(assists) AS total_assists
     FROM hero_combinations
     WHERE 1=1
     AND length(hero_ids) = 6
@@ -287,24 +314,41 @@ def get_hero_combs_win_loss_stats(
         )
     if comb_size == 6:
         comb_stats = [
-            HeroCombsWinLossStat(hero_ids=heroes, wins=wins, losses=losses, matches=wins + losses)
-            for heroes, wins, losses in result
+            HeroCombsWinLossStat(
+                hero_ids=heroes,
+                wins=wins,
+                losses=losses,
+                matches=wins + losses,
+                total_kills=kills,
+                total_deaths=deaths,
+                total_assists=assists,
+            )
+            for heroes, wins, losses, kills, deaths, assists in result
             if min_total_matches is None or wins + losses >= min_total_matches
         ]
     else:
-        comb_stats = defaultdict(lambda: [0, 0])
-        for [hero_ids, wins, losses] in result:
+        comb_stats = defaultdict(lambda: [0, 0, 0, 0, 0])
+        for hero_ids, wins, losses, kills, deaths, assists in result:
             for hero_comb in itertools.combinations(hero_ids, comb_size):
                 if include_hero_ids and not all(h in hero_comb for h in include_hero_ids):
                     continue
                 comb_stats[hero_comb][0] += wins
                 comb_stats[hero_comb][1] += losses
+                comb_stats[hero_comb][2] += kills
+                comb_stats[hero_comb][3] += deaths
+                comb_stats[hero_comb][4] += assists
 
         comb_stats = [
             HeroCombsWinLossStat(
-                hero_ids=list(heroes), wins=wins, losses=losses, matches=wins + losses
+                hero_ids=list(heroes),
+                wins=wins,
+                losses=losses,
+                matches=wins + losses,
+                total_kills=kills,
+                total_deaths=deaths,
+                total_assists=assists,
             )
-            for heroes, (wins, losses) in comb_stats.items()
+            for heroes, (wins, losses, kills, deaths, assists) in comb_stats.items()
             if min_total_matches is None or wins + losses >= min_total_matches
         ]
     match sorted_by:
