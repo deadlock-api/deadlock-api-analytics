@@ -115,16 +115,19 @@ class PlayerHeroStat(BaseModel):
     hero_id: int
     matches: int
     wins: int
+    ending_level: float
     kills: int
     deaths: int
     assists: int
-    ending_level: float
     denies_per_match: float
+    kills_per_min: float
+    deaths_per_min: float
+    assists_per_min: float
+    denies_per_min: float
     networth_per_min: float
     damage_mitigated_per_min: float
     damage_taken_per_min: float
     creeps_per_min: float
-    denies_per_min: float
     obj_damage_per_min: float
     accuracy: float
     crit_shot_rate: float
