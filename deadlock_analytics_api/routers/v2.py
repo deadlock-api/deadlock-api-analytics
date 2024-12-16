@@ -204,7 +204,10 @@ def get_hero_combs_win_loss_stats(
     min_total_matches: Annotated[
         int | None, Query(ge=0, description="Minimum total matches")
     ] = None,
-    sorted_by: Literal["winrate", "wins", "matches"] | None = None,
+    sorted_by: Annotated[
+        Literal["winrate", "wins", "matches"] | None,
+        Query(description="Sort output descending by this field"),
+    ] = None,
     limit: Annotated[int | None, Query(ge=0)] = None,
     min_badge_level: Annotated[int | None, Query(ge=0)] = None,
     max_badge_level: Annotated[int | None, Query(le=116)] = None,
