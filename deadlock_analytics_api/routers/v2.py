@@ -5,7 +5,6 @@ from typing import Annotated, Literal
 
 from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException, Path, Query
-from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_301_MOVED_PERMANENTLY
@@ -24,6 +23,7 @@ from deadlock_analytics_api.routers.v2_models import (
     PlayerMate,
     PlayerMMRHistoryEntryV2,
     PlayerParty,
+    HeroCombsWinLossStat,
 )
 
 router = APIRouter(prefix="/v2", tags=["V2"])
@@ -184,13 +184,6 @@ def get_hero_win_loss_stats(
     return [
         HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2], matches=r[1] + r[2]) for r in result
     ]
-
-
-class HeroCombsWinLossStat(BaseModel):
-    hero_ids: list[int]
-    wins: int
-    losses: int
-    matches: int
 
 
 @router.get("/hero-combs-win-loss-stats", summary="RateLimit: 100req/s")
@@ -399,7 +392,10 @@ def get_hero_item_win_loss_stats_cached(
                 "region": region,
             },
         )
-    return [ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3]) for r in result]
+    return [
+        ItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3], matches=r[2] + r[3])
+        for r in result
+    ]
 
 
 @router.get(

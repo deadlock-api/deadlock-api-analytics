@@ -33,6 +33,7 @@ class ItemWinLossStat(BaseModel):
     item_id: int
     wins: int
     losses: int
+    matches: int
 
 
 class PlayerCardSlot(BaseModel):
@@ -168,3 +169,10 @@ class PlayerParty(BaseModel):
     wins: int
     matches_played: int
     matches: list[int]
+
+
+class HeroCombsWinLossStat(BaseModel):
+    hero_ids: list[int]
+    wins: int
+    losses: int
+    matches: int
