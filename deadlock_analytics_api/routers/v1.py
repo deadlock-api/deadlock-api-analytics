@@ -169,12 +169,26 @@ def get_player_badge_level_distribution(
         SELECT ranked_badge_level
         FROM player_card
         INNER JOIN player USING account_id
-        WHERE ranked_badge_level > 0
+        WHERE created_at <= toDateTime('2024-11-22 01:08:32')
         AND (%(region)s IS NULL OR region_mode = %(region)s)
         AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
         ORDER BY created_at DESC
         LIMIT 1 BY account_id
+
+        UNION ALL
+
+        SELECT multiIf(team = 'Team0', mi.average_badge_team0, team = 'Team1', mi.average_badge_team1, 0) AS ranked_badge_level
+        FROM match_player
+        INNER JOIN match_info mi USING (match_id)
+        INNER JOIN player USING account_id
+        WHERE account_id > 0
+        AND created_at > toDateTime('2024-11-22 01:08:32')
+        AND (%(region)s IS NULL OR region_mode = %(region)s)
+        AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
+        ORDER BY start_time DESC
+        LIMIT 1 by account_id
     )
     SELECT ranked_badge_level, COUNT(*) AS count
     FROM ranked_badge
