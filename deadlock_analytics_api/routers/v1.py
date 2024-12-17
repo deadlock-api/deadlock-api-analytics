@@ -128,25 +128,56 @@ class MatchBadgeLevelDistribution(BaseModel):
 
 @router.get("/match-badge-level-distribution", summary="RateLimit: 100req/s")
 def get_match_badge_level_distribution(
-    req: Request, res: Response
+    req: Request,
+    res: Response,
+    min_unix_timestamp: int | None = None,
+    max_unix_timestamp: int | None = None,
 ) -> list[MatchBadgeLevelDistribution]:
     limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
-    SELECT ranked_badge_level, COUNT(DISTINCT match_id) as match_score_count
-    FROM finished_matches
-    WHERE ranked_badge_level IS NOT NULL
+    WITH ranked_badge AS (
+        SELECT ranked_badge_level
+        FROM finished_matches
+        WHERE (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+
+        UNION ALL
+
+        SELECT ranked_badge_level
+        FROM match_info
+        ARRAY JOIN [average_badge_team0, average_badge_team1] AS ranked_badge_level
+        WHERE match_id NOT IN (SELECT match_id FROM finished_matches)
+        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+    )
+    SELECT ranked_badge_level, COUNT() as match_score_count
+    FROM ranked_badge
+    WHERE ranked_badge_level > 0
     GROUP BY ranked_badge_level
     ORDER BY ranked_badge_level;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query)
+        result = client.execute(
+            query,
+            {"min_unix_timestamp": min_unix_timestamp, "max_unix_timestamp": max_unix_timestamp},
+        )
     return [MatchBadgeLevelDistribution(match_badge_level=row[0], count=row[1]) for row in result]
 
 
 class PlayerBadgeLevelDistribution(BaseModel):
     player_badge_level: int
     count: int
+
+    @computed_field
+    @property
+    def player_ranked_rank(self) -> int | None:
+        return self.player_badge_level // 10 if self.player_badge_level is not None else None
+
+    @computed_field
+    @property
+    def player_ranked_subrank(self) -> int | None:
+        return self.player_badge_level % 10 if self.player_badge_level is not None else None
 
 
 @router.get("/player-badge-level-distribution", summary="RateLimit: 100req/s")
@@ -185,8 +216,8 @@ def get_player_badge_level_distribution(
         WHERE account_id > 0
         AND created_at > toDateTime('2024-11-22 01:08:32')
         AND (%(region)s IS NULL OR region_mode = %(region)s)
-        AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
         ORDER BY start_time DESC
         LIMIT 1 by account_id
     )
