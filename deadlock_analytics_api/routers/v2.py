@@ -24,6 +24,8 @@ from deadlock_analytics_api.routers.v2_models import (
     PlayerParty,
     HeroCombsWinLossStat,
     HeroWinLossStatV2,
+    HeroMatchUpWinLossStat,
+    HeroMatchUpWinLossStatMatchUp,
 )
 
 router = APIRouter(prefix="/v2", tags=["V2"])
@@ -361,6 +363,122 @@ def get_hero_combs_win_loss_stats(
     if limit is not None:
         comb_stats = comb_stats[:limit]
     return comb_stats
+
+
+@router.get("/hero-matchups-win-loss-stats", summary="RateLimit: 100req/s")
+def get_hero_matchups_win_loss_stats(
+    req: Request,
+    res: Response,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
+) -> list[HeroMatchUpWinLossStat]:
+    limiter.apply_limits(
+        req, res, "/v2/hero-matchup-win-loss-stats", [RateLimit(limit=100, period=1)]
+    )
+    res.headers["Cache-Control"] = "public, max-age=1200"
+
+    query = """
+    WITH hero_combinations AS (
+        SELECT
+            groupArrayIf(hero_id, team = 'Team0') AS team0_hero_id,
+            groupArrayIf(hero_id, team = 'Team1') AS team1_hero_id,
+            sumIf(won, team = 'Team0')            AS team0_wins,
+            sumIf(won, team = 'Team1')            AS team1_wins,
+            sumIf(kills, team = 'Team0')          AS team0_kills,
+            sumIf(kills, team = 'Team1')          AS team1_kills,
+            sumIf(deaths, team = 'Team0')         AS team0_deaths,
+            sumIf(deaths, team = 'Team1')         AS team1_deaths,
+            sumIf(assists, team = 'Team0')        AS team0_assists,
+            sumIf(assists, team = 'Team1')        AS team1_assists
+        FROM match_player FINAL
+        INNER JOIN match_info mi USING (match_id)
+        INNER JOIN player p USING (account_id)
+        WHERE 1=1
+        AND mi.match_outcome = 'TeamWin'
+        AND mi.match_mode IN ('Ranked', 'Unranked')
+        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
+        GROUP BY match_id, assigned_lane
+        HAVING length(team0_hero_id) = 1
+        AND length(team1_hero_id) = 1
+        AND team0_hero_id != team1_hero_id)
+    SELECT
+        least(team0_hero_id[1], team1_hero_id[1])                                  AS hero0,
+        greatest(team0_hero_id[1], team1_hero_id[1])                               AS hero1,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team0_wins, team1_wins))       AS hero0_wins,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team0_kills, team1_kills))     AS hero0_kills,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team0_deaths, team1_deaths))   AS hero0_deaths,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team0_assists, team1_assists)) AS hero0_assists,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team1_wins, team0_wins))       AS hero1_wins,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team1_kills, team0_kills))     AS hero1_kills,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team1_deaths, team0_deaths))   AS hero1_deaths,
+        sum(if(team0_hero_id[1] < team1_hero_id[1], team1_assists, team0_assists)) AS hero1_assists
+    FROM hero_combinations
+    GROUP BY hero0, hero1
+    ORDER BY hero0, hero1;
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_unix_timestamp": min_unix_timestamp,
+                "max_unix_timestamp": max_unix_timestamp,
+                "match_mode": match_mode,
+                "region": region,
+            },
+        )
+    matchups = defaultdict(lambda: list())
+    for (
+        hero0,
+        hero1,
+        hero0_wins,
+        hero0_kills,
+        hero0_deaths,
+        hero0_assists,
+        hero1_wins,
+        hero1_kills,
+        hero1_deaths,
+        hero1_assists,
+    ) in result:
+        matchups[hero0].append(
+            HeroMatchUpWinLossStatMatchUp(
+                hero_id=hero1,
+                wins=hero0_wins,
+                losses=hero1_wins,
+                matches=hero0_wins + hero1_wins,
+                total_kills=hero0_kills,
+                total_kills_received=hero1_deaths,
+                total_deaths=hero0_deaths,
+                total_deaths_received=hero1_deaths,
+                total_assists=hero0_assists,
+                total_assists_received=hero1_assists,
+            )
+        )
+        matchups[hero1].append(
+            HeroMatchUpWinLossStatMatchUp(
+                hero_id=hero0,
+                wins=hero1_wins,
+                losses=hero0_wins,
+                matches=hero0_wins + hero1_wins,
+                total_kills=hero1_kills,
+                total_kills_received=hero0_deaths,
+                total_deaths=hero1_deaths,
+                total_deaths_received=hero0_deaths,
+                total_assists=hero1_assists,
+                total_assists_received=hero0_assists,
+            )
+        )
+    return [HeroMatchUpWinLossStat(hero_id=h, matchups=matchups[h]) for h in matchups]
 
 
 @router.get("/hero/{hero_id}/item-win-loss-stats", summary="RateLimit: 100req/s")
