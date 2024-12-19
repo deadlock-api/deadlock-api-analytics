@@ -1035,17 +1035,17 @@ def post_win_rate_analysis(
             # Build the exclusion/requirement conditions
             exclude_conditions = [
                 clean(
-                    "NOT arrayExists(i -> i.item_id = %(item_id)s, mp.items)",
+                    "NOT arrayExists(i -> i = %(item_id)s, items)",
                     {"item_id": item_id},
                 )
-                for item_id in excluded_item_ids[:15]
+                for item_id in excluded_item_ids[:30]
             ]
             require_conditions = [
                 clean(
-                    "arrayExists(i -> i.item_id = %(item_id)s, mp.items)",
+                    "arrayExists(i -> i = %(item_id)s, items)",
                     {"item_id": item_id},
                 )
-                for item_id in required_item_ids[:15]
+                for item_id in required_item_ids[:30]
             ]
 
             additional_conditions = " AND ".join(exclude_conditions + require_conditions)
@@ -1053,38 +1053,36 @@ def post_win_rate_analysis(
                 additional_conditions = "AND " + additional_conditions
 
             query = f"""
-            WITH (
-                SELECT MIN(match_id) AS min_id
-                FROM match_info mi
-                WHERE mi.start_time > toDateTime(%(start_time)s)
-            ) AS min_id,
-            valid_matches AS (
-                SELECT DISTINCT match_id, mp.account_id AS account_id
-                FROM match_player mp
-                JOIN match_info mi ON mi.match_id = mp.match_id
+            WITH valid_matches AS (
+                SELECT
+                    DISTINCT ON(match_id)
+                    match_id,
+                    hero_id,
+                    groupArray(item_id) AS items
+                FROM match_player_item_v2 mpi
                 WHERE
-                    mp.match_id > min_id AND
-                    mi.match_mode IN ('Ranked', 'Unranked') AND
-                    mp.hero_id = %(hero_id)s AND
-                    (mi.average_badge_team0 > %(min_badge_level)s AND mi.average_badge_team1 > %(min_badge_level)s)
+                    mpi.start_time > toDateTime(%(start_time)s)  AND
+                    mpi.hero_id = %(hero_id)s AND
+                    mpi.average_match_badge > %(min_badge_level)s
+                GROUP BY match_id, hero_id
+                HAVING
                     {additional_conditions}
-            ),
-            valid_mpi AS (
-                SELECT *, vm.account_id AS account_id
-                FROM match_player_item mpi
-                JOIN valid_matches vm ON mpi.match_id = vm.match_id
-                WHERE mpi.match_id > min_id
             )
             SELECT
                 hero_id,
-                mpi.item_id AS item_id_1,
+                mpi.item_id AS item_id,
                 COUNT() AS total,
                 countIf(won = true) AS wins,
-                count(DISTINCT account_id) AS unique_users
-            FROM valid_mpi mpi
-            WHERE mpi.hero_id = %(hero_id)s
+                count(DISTINCT mpi.account_id) AS unique_users
+            FROM match_player_item_v2 mpi
+            JOIN valid_matches USING (match_id)
+            WHERE
+                mpi.hero_id = %(hero_id)s AND
+                won IS NOT NULL AND
+                start_time > toDateTime(%(start_time)s)
             GROUP BY hero_id, mpi.item_id
-            SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 4, count_distinct_implementation = 'uniq'
+            ORDER BY hero_id, item_id
+            SETTINGS max_execution_time = 360, join_algorithm = 'auto', max_threads = 8, count_distinct_implementation = 'uniq';
             """
 
             result = client.execute(
