@@ -1084,7 +1084,7 @@ def post_win_rate_analysis(
             FROM valid_mpi mpi
             WHERE mpi.hero_id = %(hero_id)s
             GROUP BY hero_id, mpi.item_id
-            SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 10
+            SETTINGS max_execution_time = 360, join_algorithm = 'partial_merge', max_threads = 4, count_distinct_implementation = 'uniq'
             """
 
             result = client.execute(
