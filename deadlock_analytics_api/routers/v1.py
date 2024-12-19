@@ -1049,8 +1049,6 @@ def post_win_rate_analysis(
             ]
 
             additional_conditions = " AND ".join(exclude_conditions + require_conditions)
-            if additional_conditions:
-                additional_conditions = "AND " + additional_conditions
 
             query = f"""
             WITH valid_matches AS (
