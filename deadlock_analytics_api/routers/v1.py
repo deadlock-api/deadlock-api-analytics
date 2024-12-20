@@ -57,6 +57,9 @@ def get_api_info(req: Request, res: Response) -> APIInfo:
     WHERE database = 'default'
         AND name NOT LIKE 'system.%'
         AND name NOT LIKE '%inner%'
+        AND total_rows IS NOT NULL
+        AND total_bytes IS NOT NULL
+        AND total_bytes_uncompressed IS NOT NULL
     ORDER BY table;
     """
     query2 = """
