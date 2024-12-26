@@ -28,8 +28,15 @@ class PlayerLeaderboardV2(BaseModel):
         return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
-class ItemWinLossStat(BaseModel):
+class HeroItemWinLossStat(BaseModel):
     hero_id: int
+    item_id: int
+    wins: int
+    losses: int
+    matches: int
+
+
+class ItemWinLossStat(BaseModel):
     item_id: int
     wins: int
     losses: int
