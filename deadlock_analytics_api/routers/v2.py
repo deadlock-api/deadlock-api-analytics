@@ -619,7 +619,6 @@ def get_item_win_loss_stats_cached(
     WHERE TRUE
     AND mi.match_outcome = 'TeamWin'
     AND mi.match_mode IN ('Ranked', 'Unranked')
-    AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
     AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
     AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
     AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
