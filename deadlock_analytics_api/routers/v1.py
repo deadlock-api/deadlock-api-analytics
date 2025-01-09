@@ -1045,7 +1045,7 @@ def get_item_comb_win_rate_by_similarity(
     if item_ids is None and build_id is not None:
         build = requests.get(f"https://data.deadlock-api.com/v1/builds/{build_id}").json()
         mod_categories = build["hero_build"]["details"]["mod_categories"]
-        item_ids = list({i["ability_id"] for c in mod_categories for i in c["mods"]})
+        item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
 
     query = """
     WITH
