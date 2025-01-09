@@ -1087,9 +1087,9 @@ def get_item_comb_win_rate_by_similarity(
     result = result[0]
     return ItemCombWinRateEntry(
         item_ids=item_ids,
-        wins=result[0],
-        total=result[1],
-        unique_users=result[2],
+        wins=result[0] or 0,
+        total=result[1] or 0,
+        unique_users=result[2] or 0,
     )
 
 
