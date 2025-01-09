@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
+import requests
 from clickhouse_driver import Client
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
@@ -995,6 +996,101 @@ def get_player_mmr_history(
         )
         for r in result
     ]
+
+
+class ItemCombWinRateEntry(BaseModel):
+    item_ids: list[int]
+    wins: int
+    total: int
+    unique_users: int
+
+    @computed_field
+    @property
+    def win_rate(self) -> float:
+        return round(self.wins / self.total, 2)
+
+
+@router.get("/dev/item-win-rate-analysis/by-similarity", summary="RateLimit: 100req/s")
+def get_item_comb_win_rate_by_similarity(
+    req: Request,
+    res: Response,
+    item_ids: str | None = None,
+    build_id: int | None = None,
+    hero_id: int | None = None,
+    min_badge_level: int | None = None,
+    max_badge_level: int | None = None,
+    min_match_id: int | None = None,
+    max_match_id: int | None = None,
+    max_l1_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
+    k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
+) -> ItemCombWinRateEntry:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/dev/item-win-rate-analysis/by-similarity",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=1800"
+    if item_ids is None and build_id is None:
+        raise HTTPException(status_code=400, detail="Either item_ids or build_id must be provided")
+    if item_ids is not None and build_id is not None:
+        raise HTTPException(
+            status_code=400, detail="Only one of item_ids or build_id can be provided"
+        )
+    if item_ids is not None:
+        try:
+            item_ids = [int(i) for i in item_ids.split(",")]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid item_ids, must be comma separated")
+    if item_ids is None and build_id is not None:
+        build = requests.get(f"https://data.deadlock-api.com/v1/builds/{build_id}").json()
+        mod_categories = build["hero_build"]["details"]["mod_categories"]
+        item_ids = list({i["ability_id"] for c in mod_categories for i in c["mods"]})
+
+    query = """
+    WITH
+        all_items as (SELECT groupUniqArray(item_id) as items_arr FROM items),
+        build_items as (SELECT arrayMap(x -> has(%(item_ids)s, x), arraySort(items_arr)) as encoded_build_items FROM all_items),
+        relevant_matches as (
+            SELECT account_id, won, L1Distance(encoded_build_items, encoded_items) as distance
+            FROM match_player_encoded_items
+                CROSS JOIN build_items
+            WHERE 1=1
+                AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
+                AND (%(min_badge_level)s IS NULL OR average_badge >= %(min_badge_level)s)
+                AND (%(max_badge_level)s IS NULL OR average_badge <= %(max_badge_level)s)
+                AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
+                AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
+                AND (%(max_l1_distance)s IS NULL OR distance <= %(max_l1_distance)s)
+            ORDER BY distance
+            LIMIT %(limit)s
+        )
+    SELECT sum(won) as wins, count() as total, COUNT(DISTINCT account_id) as unique_accounts
+    FROM relevant_matches
+    """
+    with CH_POOL.get_client() as client:
+        result = client.execute(
+            query,
+            {
+                "item_ids": item_ids,
+                "hero_id": hero_id,
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "max_l1_distance": max_l1_distance,
+                "limit": k_most_similar_builds,
+            },
+        )
+    if len(result) == 0:
+        raise HTTPException(status_code=404, detail="No matches found")
+    result = result[0]
+    return ItemCombWinRateEntry(
+        item_ids=item_ids,
+        wins=result[0],
+        total=result[1],
+        unique_users=result[2],
+    )
 
 
 class ItemWinRateEntry(BaseModel):
