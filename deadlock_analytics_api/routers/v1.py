@@ -1009,6 +1009,8 @@ class ItemCombWinRateEntry(BaseModel):
     @computed_field
     @property
     def win_rate(self) -> float:
+        if self.total == 0:
+            return 0.0
         return round(self.wins / self.total, 2)
 
 
