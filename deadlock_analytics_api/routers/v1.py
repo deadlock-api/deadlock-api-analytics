@@ -1003,6 +1003,8 @@ class ItemCombWinRateEntry(BaseModel):
     wins: int
     total: int
     unique_users: int
+    min_distance: int | None
+    max_distance: int | None
 
     @computed_field
     @property
@@ -1065,7 +1067,7 @@ def get_item_comb_win_rate_by_similarity(
             ORDER BY distance
             LIMIT %(limit)s
         )
-    SELECT sum(won) as wins, count() as total, COUNT(DISTINCT account_id) as unique_accounts
+    SELECT sum(won) as wins, count() as total, COUNT(DISTINCT account_id) as unique_accounts, min(distance) as min_distance, max(distance) as max_distance
     FROM relevant_matches
     """
     with CH_POOL.get_client() as client:
@@ -1090,6 +1092,8 @@ def get_item_comb_win_rate_by_similarity(
         wins=result[0] or 0,
         total=result[1] or 0,
         unique_users=result[2] or 0,
+        min_distance=result[3],
+        max_distance=result[4],
     )
 
 
