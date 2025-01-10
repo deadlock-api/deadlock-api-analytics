@@ -1054,7 +1054,7 @@ def get_item_comb_win_rate_by_similarity(
     query = """
     WITH
         all_items as (SELECT groupUniqArray(item_id) as items_arr FROM items),
-        build_items as (SELECT arrayMap(x -> has(%(item_ids)s, x), arraySort(items_arr)) as encoded_build_items FROM all_items),
+        build_items as (SELECT arrayMap(x -> toBool(has(%(item_ids)s, x)), arraySort(items_arr)) as encoded_build_items FROM all_items),
         relevant_matches as (
             SELECT account_id, won, L1Distance(encoded_build_items, encoded_items) as distance
             FROM match_player_encoded_items
