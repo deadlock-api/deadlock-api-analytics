@@ -486,7 +486,12 @@ def match_search(
     max_duration_s: Annotated[int | None, Query(le=7000)] = None,
     min_average_badge: Annotated[int | None, Query(ge=0)] = None,
     max_average_badge: Annotated[int | None, Query(le=116)] = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    match_mode: Annotated[
+        str | None,
+        Query(
+            description="Comma seperated List; Possible values: Unranked, PrivateLobby, CoopBot, Ranked, ServerTest, Tutorial, HeroLabs; Default: Unranked,Ranked",
+        ),
+    ] = None,
     is_high_skill_range_parties: bool | None = None,
     is_low_pri_pool: bool | None = None,
     is_new_player_pool: bool | None = None,
@@ -511,13 +516,14 @@ def match_search(
             if f != "match_id" and len(f) > 0 and f in MATCH_PLAYER_FIELDS
         ]
     )
+    if match_mode is None:
+        match_mode = "Unranked,Ranked"
     query = f"""
     SELECT match_id, {select_list}
     FROM match_player mp
     INNER JOIN match_info mi USING match_id
     WHERE TRUE
     AND mi.match_outcome = 'TeamWin'
-    AND mi.match_mode IN ('Ranked', 'Unranked')
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
@@ -526,7 +532,7 @@ def match_search(
     AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
     AND (%(min_average_badge)s IS NULL OR least(mi.average_badge_team0, mi.average_badge_team1) >= %(min_average_badge)s)
     AND (%(max_average_badge)s IS NULL OR greatest(mi.average_badge_team0, mi.average_badge_team1) <= %(max_average_badge)s)
-    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+    AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
     AND (%(is_high_skill_range_party)s IS NULL OR mi.is_high_skill_range_parties = %(is_high_skill_range_party)s)
     AND (%(is_low_pri_pool)s IS NULL OR mi.low_pri_pool = %(is_low_pri_pool)s)
     AND (%(is_new_player_pool)s IS NULL OR mi.new_player_pool = %(is_new_player_pool)s)
@@ -546,7 +552,7 @@ def match_search(
                 "max_duration_s": max_duration_s,
                 "min_average_badge": min_average_badge,
                 "max_average_badge": max_average_badge,
-                "match_mode": match_mode,
+                "match_mode": match_mode.split(",") if match_mode is not None else None,
                 "is_high_skill_range_party": is_high_skill_range_parties,
                 "is_low_pri_pool": is_low_pri_pool,
                 "is_new_player_pool": is_new_player_pool,
