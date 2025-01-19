@@ -511,7 +511,7 @@ def match_search(
             if f != "match_id" and len(f) > 0 and f in MATCH_INFO_FIELDS
         ]
         + [
-            f"groupArray(mp.{f}) as players_{f.replace('.','_')}"
+            f"groupArray(mp.{f}) as players_{f.replace('.', '_')}"
             for f in (match_player_return_fields or "").split(",")
             if f != "match_id" and len(f) > 0 and f in MATCH_PLAYER_FIELDS
         ]
@@ -1031,7 +1031,8 @@ def get_item_comb_win_rate_by_similarity(
     max_badge_level: int | None = None,
     min_match_id: int | None = None,
     max_match_id: int | None = None,
-    max_l1_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
+    max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
+    distance_function: Literal["L1", "cosine"] | None = None,
     k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
 ) -> ItemCombWinRateEntry:
     limiter.apply_limits(
@@ -1059,12 +1060,19 @@ def get_item_comb_win_rate_by_similarity(
         mod_categories = build["hero_build"]["details"]["mod_categories"]
         item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
 
-    query = """
+    if distance_function is None or distance_function == "L1":
+        distance_function = "L1Distance(encoded_build_items, encoded_items)"
+    elif distance_function == "cosine":
+        distance_function = "cosineDistance(encoded_build_items, encoded_items)"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid distance_function")
+
+    query = f"""
     WITH
         all_items as (SELECT groupUniqArray(item_id) as items_arr FROM items),
         build_items as (SELECT arrayMap(x -> toBool(has(%(item_ids)s, x)), arraySort(items_arr)) as encoded_build_items FROM all_items),
         relevant_matches as (
-            SELECT account_id, won, L1Distance(encoded_build_items, encoded_items) as distance
+            SELECT account_id, won, {distance_function} as distance
             FROM match_player_encoded_items
                 CROSS JOIN build_items
             WHERE 1=1
@@ -1073,7 +1081,7 @@ def get_item_comb_win_rate_by_similarity(
                 AND (%(max_badge_level)s IS NULL OR average_badge <= %(max_badge_level)s)
                 AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
                 AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-                AND (%(max_l1_distance)s IS NULL OR distance <= %(max_l1_distance)s)
+                AND (%(max_distance)s IS NULL OR distance <= %(max_distance)s)
             ORDER BY distance
             LIMIT %(limit)s
         )
@@ -1090,7 +1098,7 @@ def get_item_comb_win_rate_by_similarity(
                 "max_badge_level": max_badge_level,
                 "min_match_id": min_match_id,
                 "max_match_id": max_match_id,
-                "max_l1_distance": max_l1_distance,
+                "max_distance": max_distance,
                 "limit": k_most_similar_builds,
             },
         )
