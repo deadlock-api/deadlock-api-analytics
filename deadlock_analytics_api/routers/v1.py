@@ -1031,6 +1031,7 @@ def get_item_comb_win_rate_by_similarity(
     max_badge_level: int | None = None,
     min_match_id: int | None = None,
     max_match_id: int | None = None,
+    min_used_items: int | None = None,
     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
     distance_function: Literal[
         "L1", "cosine", "non_matching_build_items", "non_matching_items"
@@ -1092,6 +1093,7 @@ def get_item_comb_win_rate_by_similarity(
                 AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
                 AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
                 AND (%(max_distance)s IS NULL OR distance <= %(max_distance)s)
+                AND (%(min_used_items)s IS NULL OR arraySum(encoded_items) >= %(min_used_items)s)
             ORDER BY distance
             LIMIT %(limit)s
         )
@@ -1109,6 +1111,7 @@ def get_item_comb_win_rate_by_similarity(
                 "min_match_id": min_match_id,
                 "max_match_id": max_match_id,
                 "max_distance": max_distance,
+                "min_used_items": min_used_items,
                 "limit": k_most_similar_builds,
             },
         )
