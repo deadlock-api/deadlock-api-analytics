@@ -1032,7 +1032,9 @@ def get_item_comb_win_rate_by_similarity(
     min_match_id: int | None = None,
     max_match_id: int | None = None,
     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
-    distance_function: Literal["L1", "cosine"] | None = None,
+    distance_function: Literal[
+        "L1", "cosine", "non_matching_build_items", "non_matching_items"
+    ] = None,
     k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
 ) -> ItemCombWinRateEntry:
     limiter.apply_limits(
