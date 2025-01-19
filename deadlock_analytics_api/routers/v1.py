@@ -1064,6 +1064,14 @@ def get_item_comb_win_rate_by_similarity(
         distance_function = "L1Distance(encoded_build_items, encoded_items)"
     elif distance_function == "cosine":
         distance_function = "cosineDistance(encoded_build_items, encoded_items)"
+    elif distance_function == "non_matching_build_items":
+        distance_function = (
+            "arraySum(encoded_build_items) - arrayDotProduct(encoded_build_items, encoded_items)"
+        )
+    elif distance_function == "non_matching_items":
+        distance_function = (
+            "arraySum(encoded_items) - arrayDotProduct(encoded_build_items, encoded_items)"
+        )
     else:
         raise HTTPException(status_code=400, detail="Invalid distance_function")
 
