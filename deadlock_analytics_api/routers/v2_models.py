@@ -132,6 +132,7 @@ class PlayerHeroStat(BaseModel):
     assists_per_min: float
     denies_per_min: float
     networth_per_min: float
+    last_hits_per_min: float
     damage_mitigated_per_min: float
     damage_taken_per_min: float
     creeps_per_min: float
