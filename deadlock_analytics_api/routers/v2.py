@@ -1138,7 +1138,7 @@ def get_matches_by_account_id(
     LEFT JOIN match_info mi USING (match_id)
     WHERE account_id = %(account_id)s
     AND mi.match_outcome = 'TeamWin'
-    AND mi.match_mode IN ('Ranked', 'Unranked')
+    AND pmh.match_mode IN ('Ranked', 'Unranked')
     AND (%(has_metadata)s IS NULL OR toBool(mi.match_id > 0) = %(has_metadata)s)
     AND (%(min_unix_timestamp)s IS NULL OR pmh.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR pmh.start_time <= toDateTime(%(max_unix_timestamp)s))
