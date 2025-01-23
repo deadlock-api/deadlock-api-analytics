@@ -1063,9 +1063,10 @@ def get_item_comb_win_rate_by_similarity(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid item_ids, must be comma separated")
     if item_ids is None and build_id is not None:
-        build = requests.get(f"https://data.deadlock-api.com/v1/builds/{build_id}").json()
+        build = requests.get(f"https://data.deadlock-api.com/v1/builds/{build_id}")
         if build.status_code != 200:
             raise HTTPException(status_code=404, detail="Build not found")
+        build = build.json()
         mod_categories = build["hero_build"]["details"]["mod_categories"]
         item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
 
