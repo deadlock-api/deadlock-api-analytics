@@ -1037,7 +1037,6 @@ def get_item_comb_win_rate_by_similarity(
         "L1", "cosine", "non_matching_build_items", "non_matching_items"
     ] = None,
     k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
-    min_total_games: int | None = None,
 ) -> ItemCombWinRateEntry:
     limiter.apply_limits(
         req,
@@ -1046,11 +1045,6 @@ def get_item_comb_win_rate_by_similarity(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=1800"
-    if min_total_games is not None and min_total_games > k_most_similar_builds:
-        raise HTTPException(
-            status_code=400,
-            detail="min_total_games must be less than or equal to k_most_similar_builds",
-        )
     if item_ids is None and build_id is None:
         raise HTTPException(status_code=400, detail="Either item_ids or build_id must be provided")
     if item_ids is not None and build_id is not None:
@@ -1106,7 +1100,6 @@ def get_item_comb_win_rate_by_similarity(
         )
     SELECT sum(won) as wins, count() as total, COUNT(DISTINCT account_id) as unique_accounts, min(distance) as min_distance, max(distance) as max_distance
     FROM relevant_matches
-    HAVING (%(min_total_games)s IS NULL OR total >= %(min_total_games)s)
     """
     with CH_POOL.get_client() as client:
         result = client.execute(
@@ -1120,7 +1113,6 @@ def get_item_comb_win_rate_by_similarity(
                 "max_match_id": max_match_id,
                 "max_distance": max_distance,
                 "min_used_items": min_used_items,
-                "min_total_games": min_total_games,
                 "limit": k_most_similar_builds,
             },
         )
