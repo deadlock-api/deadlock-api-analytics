@@ -1129,7 +1129,7 @@ def get_matches_by_account_id(
     account_id = utils.validate_steam_id(account_id)
     query = """
     SELECT
-        DISTINCT ON(pmh.match_id) pmh.*,
+        DISTINCT ON(pmh.match_id) pmh.* EXCEPT (created_at),
         toBool(mi.match_id > 0) AS has_metadata,
         mi.match_id IS NOT null ? intDivOrZero(mi.average_badge_team0 + mi.average_badge_team1, 2): null AS average_match_badge,
         round(avg(average_match_badge) OVER (ORDER BY match_id DESC ROWS BETWEEN CURRENT ROW AND 10 FOLLOWING), 2) AS moving_average_match_badge,
