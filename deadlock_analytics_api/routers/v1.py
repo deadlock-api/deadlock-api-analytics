@@ -330,6 +330,7 @@ class MatchSearchResult(BaseModel):
 )
 def match_search_ids(
     req: Request,
+    account_id: Annotated[int, Path(description="The account id of a player to search for")] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -478,6 +479,7 @@ def match_search(
             description=f"Possible fields:\n{match_player_fields_markdown_list}",
         ),
     ] = None,
+    account_id: Annotated[int, Path(description="The account id of a player to search for")] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -524,6 +526,7 @@ def match_search(
     INNER JOIN match_info mi USING match_id
     WHERE TRUE
     AND mi.match_outcome = 'TeamWin'
+    AND (%(account_id)s IS NULL OR mp.account_id = %(account_id)s)
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
@@ -544,6 +547,7 @@ def match_search(
         results, keys = client.execute(
             query,
             {
+                "account_id": account_id,
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
                 "min_match_id": min_match_id,
