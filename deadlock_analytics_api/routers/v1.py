@@ -479,7 +479,9 @@ def match_search(
             description=f"Possible fields:\n{match_player_fields_markdown_list}",
         ),
     ] = None,
-    account_id: Annotated[int, Path(description="The account id of a player to search for")] = None,
+    account_id: Annotated[
+        int, Query(description="The account id of a player to search for")
+    ] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -505,6 +507,7 @@ def match_search(
         "/v1/matches/search",
         [RateLimit(limit=100, period=1)],
     )
+    print(account_id)
     select_list = ", ".join(
         m
         for m in [
