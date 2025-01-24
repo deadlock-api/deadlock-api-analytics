@@ -1040,6 +1040,7 @@ def get_item_comb_win_rate_by_similarity(
     max_match_id: int | None = None,
     min_used_items: int | None = None,
     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
+    max_unused_items: Annotated[int | None, Query(ge=0)] = None,
     distance_function: Literal[
         "L1", "cosine", "non_matching_build_items", "non_matching_items"
     ] = None,
@@ -1071,6 +1072,7 @@ def get_item_comb_win_rate_by_similarity(
         mod_categories = build["hero_build"]["details"]["mod_categories"]
         item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
 
+    max_unused_items_filter = "AND TRUE"
     if distance_function is None or distance_function == "L1":
         distance_function = "L1Distance(encoded_build_items, encoded_items)"
     elif distance_function == "cosine":
@@ -1079,10 +1081,18 @@ def get_item_comb_win_rate_by_similarity(
         distance_function = (
             "arraySum(encoded_build_items) - arrayDotProduct(encoded_build_items, encoded_items)"
         )
+        if max_unused_items:
+            max_unused_items_filter = (
+                f"AND arraySum(encoded_items) - arraySum(encoded_build_items) <= {max_unused_items}"
+            )
     elif distance_function == "non_matching_items":
         distance_function = (
             "arraySum(encoded_items) - arrayDotProduct(encoded_build_items, encoded_items)"
         )
+        if max_unused_items:
+            max_unused_items_filter = (
+                f"AND arraySum(encoded_build_items) - arraySum(encoded_items) <= {max_unused_items}"
+            )
     else:
         raise HTTPException(status_code=400, detail="Invalid distance_function")
 
@@ -1102,6 +1112,7 @@ def get_item_comb_win_rate_by_similarity(
                 AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
                 AND (%(max_distance)s IS NULL OR distance <= %(max_distance)s)
                 AND (%(min_used_items)s IS NULL OR arraySum(encoded_items) >= %(min_used_items)s)
+                {max_unused_items_filter}
             ORDER BY distance
             LIMIT %(limit)s
         )
