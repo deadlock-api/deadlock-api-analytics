@@ -84,14 +84,18 @@ def post_match_salts(
     print(f"Authenticated with API key: {api_key}")
     print(f"Received match_salts: {match_salts}")
     match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
+    errors = []
     for match_salt in match_salts:
         if not bypass_check:
             url = f"http://replay{match_salt.cluster_id}.valve.net/1422450/{match_salt.match_id}_{match_salt.metadata_salt}.meta.bz2"
             if requests.head(url).status_code != 200:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Metadata not found for match {match_salt.match_id}",
+                errors.append(
+                    HTTPException(
+                        status_code=404,
+                        detail=f"Metadata not found for match {match_salt.match_id}",
+                    )
                 )
+                continue
         try:
             query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
             with CH_POOL.get_client() as client:
@@ -107,6 +111,8 @@ def post_match_salts(
                 client.execute(query, match_salt.model_dump())
         except Exception as e:
             print(f"Failed to insert match_salt: {e}")
+    if errors:
+        raise errors[0]
     return JSONResponse(content={"success": True})
 
 
