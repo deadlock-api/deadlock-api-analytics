@@ -1038,6 +1038,8 @@ def get_item_comb_win_rate_by_similarity(
     max_badge_level: int | None = None,
     min_match_id: int | None = None,
     max_match_id: int | None = None,
+    min_unix_timestamp: int | None = None,
+    max_unix_timestamp: int | None = None,
     min_used_items: int | None = None,
     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
     max_unused_items: Annotated[int | None, Query(ge=0)] = None,
@@ -1095,6 +1097,27 @@ def get_item_comb_win_rate_by_similarity(
             )
     else:
         raise HTTPException(status_code=400, detail="Invalid distance_function")
+
+    if min_unix_timestamp is not None:
+        query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
+        with CH_POOL.get_client() as client:
+            result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
+        if len(result) >= 1:
+            min_match_id = (
+                max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
+            )
+
+    if max_unix_timestamp is not None:
+        query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
+        with CH_POOL.get_client() as client:
+            result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
+        if len(result) >= 1:
+            max_match_id = (
+                min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
+            )
+
+    if min_match_id is not None and max_match_id is not None and min_match_id > max_match_id:
+        raise HTTPException(status_code=400, detail="min_match_id must be less than max_match_id")
 
     query = f"""
     WITH
