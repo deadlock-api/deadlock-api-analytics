@@ -752,6 +752,7 @@ def get_player_hero_stats(
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[PlayerHeroStat]:
+    account_id = utils.validate_steam_id(account_id)
     return get_player_hero_stats_batch(
         req,
         res,
