@@ -1135,7 +1135,7 @@ def get_matches_by_account_id(
         mi.match_id IS NOT null ? intDivOrZero(mi.average_badge_team0 + mi.average_badge_team1, 2): null AS average_match_badge,
         round(avg(average_match_badge) OVER (ORDER BY match_id DESC ROWS BETWEEN CURRENT ROW AND 10 FOLLOWING), 2) AS moving_average_match_badge,
         round(median(average_match_badge) OVER (ORDER BY match_id DESC ROWS BETWEEN CURRENT ROW AND 10 FOLLOWING), 2) AS moving_median_match_badge
-    FROM player_match_history pmh
+    FROM player_match_history pmh FINAL
     LEFT JOIN match_info mi USING (match_id)
     WHERE account_id = %(account_id)s
     AND mi.match_outcome = 'TeamWin'

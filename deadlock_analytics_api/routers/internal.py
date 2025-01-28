@@ -37,7 +37,7 @@ def get_missing_matches(
     WITH matches AS (
         SELECT DISTINCT match_id, toUnixTimestamp(start_time) AS start_time FROM finished_matches
         UNION DISTINCT
-        SELECT DISTINCT match_id, start_time FROM player_match_history
+        SELECT DISTINCT match_id, start_time FROM player_match_history FINAL
         WHERE match_mode IN ('Ranked', 'Unranked')
     )
     SELECT DISTINCT match_id

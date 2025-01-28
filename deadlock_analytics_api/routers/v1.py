@@ -149,7 +149,7 @@ def get_match_badge_level_distribution(
         UNION ALL
 
         SELECT ranked_badge_level
-        FROM match_info
+        FROM match_info FINAL
         ARRAY JOIN [average_badge_team0, average_badge_team1] AS ranked_badge_level
         WHERE match_id NOT IN (SELECT match_id FROM finished_matches)
         AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
@@ -214,8 +214,8 @@ def get_player_badge_level_distribution(
         UNION ALL
 
         SELECT multiIf(team = 'Team0', mi.average_badge_team0, team = 'Team1', mi.average_badge_team1, 0) AS ranked_badge_level
-        FROM match_player
-        INNER JOIN match_info mi USING (match_id)
+        FROM match_player FINAL
+        INNER JOIN match_info mi FINAL USING (match_id)
         INNER JOIN player USING account_id
         WHERE account_id > 0
         AND created_at > toDateTime('2024-11-22 01:08:32')
@@ -290,7 +290,7 @@ def get_hero_leaderboard(
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
     SELECT hero_id, account_id, wins, matches as total
-    FROM player_hero_stats
+    FROM player_hero_stats FINAL
     WHERE matches >= %(min_total_games)s AND hero_id = %(hero_id)s
     ORDER BY wins / matches DESC
     LIMIT %(limit)s
@@ -525,7 +525,7 @@ def match_search(
         match_mode = "Unranked,Ranked"
     query = f"""
     SELECT match_id, {select_list}
-    FROM match_player mp
+    FROM match_player mp FINAL
     INNER JOIN match_info mi USING match_id
     WHERE TRUE
     AND mi.match_outcome = 'TeamWin'
@@ -980,7 +980,7 @@ def get_player_mmr_history(
     account_id = utils.validate_steam_id(account_id)
     query = """
     SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
-    FROM mmr_history
+    FROM mmr_history FINAL
     WHERE account_id = %(account_id)s
     ORDER BY match_id DESC;
     """
