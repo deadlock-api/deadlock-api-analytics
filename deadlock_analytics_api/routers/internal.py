@@ -88,13 +88,19 @@ def post_match_salts(
     for match_salt in match_salts:
         if not bypass_check:
             url = f"http://replay{match_salt.cluster_id}.valve.net/1422450/{match_salt.match_id}_{match_salt.metadata_salt}.meta.bz2"
-            if requests.head(url).status_code != 200:
-                errors.append(
-                    HTTPException(
+            try:
+                response = requests.head(url)
+
+                if response.status_code != 200:
+                    raise HTTPException(
                         status_code=404,
                         detail=f"Metadata not found for match {match_salt.match_id}",
                     )
-                )
+            except requests.RequestException as e:
+                errors.append(e)
+                continue
+            except HTTPException as e:
+                errors.append(e)
                 continue
         try:
             query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
@@ -112,7 +118,11 @@ def post_match_salts(
         except Exception as e:
             print(f"Failed to insert match_salt: {e}")
     if errors:
-        raise errors[0]
+        raise (
+            errors[0]
+            if isinstance(errors[0], HTTPException)
+            else HTTPException(status_code=500, detail="Failed to fetch metadata")
+        )
     return JSONResponse(content={"success": True})
 
 
