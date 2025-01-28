@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 import requests
@@ -12,6 +13,8 @@ from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.utils import is_internal_api_key
+
+LOGGER = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1", tags=["Internal API-Key required"])
 no_key_router = APIRouter(prefix="/v1", tags=["Internal"])
@@ -81,8 +84,8 @@ def post_match_salts(
     api_key = api_key or req.headers.get("X-API-Key")
     bypass_check = is_internal_api_key(api_key)
 
-    print(f"Authenticated with API key: {api_key}")
-    print(f"Received match_salts: {match_salts}")
+    LOGGER.debug(f"Authenticated with API key: {api_key}")
+    LOGGER.info(f"Received match_salts: {match_salts}")
     match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
     errors = []
     for match_salt in match_salts:
@@ -107,8 +110,8 @@ def post_match_salts(
             with CH_POOL.get_client() as client:
                 result = client.execute(query, {"match_id": match_salt.match_id})
             if len(result) > 0:
-                for i in range(10):
-                    print(f"Match {match_salt.match_id} already in match_salts")
+                LOGGER.warning(f"Match {match_salt.match_id} already in match_salts")
+                continue
             if match_salt.failed:
                 query = "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
             else:
@@ -116,7 +119,7 @@ def post_match_salts(
             with CH_POOL.get_client() as client:
                 client.execute(query, match_salt.model_dump())
         except Exception as e:
-            print(f"Failed to insert match_salt: {e}")
+            LOGGER.error(f"Failed to insert match_salt: {e}")
     if errors:
         raise (
             errors[0]
@@ -130,7 +133,7 @@ def post_match_salts(
 def get_recent_matches(
     api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> JSONResponse:
-    print(f"Authenticated with API key: {api_key}")
+    LOGGER.debug(f"Authenticated with API key: {api_key}")
     query = """
     SELECT DISTINCT match_id
     FROM finished_matches
@@ -174,7 +177,7 @@ def get_recent_matches(
 # def post_bundle(
 #     bundle: Bundle, api_key: APIKey = Depends(utils.get_internal_api_key)
 # ) -> JSONResponse:
-#     print(f"Authenticated with API key: {api_key}")
+#     LOGGER.debug(f"Authenticated with API key: {api_key}")
 #     with postgres_conn().cursor() as cursor:
 #         cursor.execute(
 #             """
@@ -194,7 +197,7 @@ def get_recent_matches(
 #     api_key: APIKey = Depends(utils.get_internal_api_key),
 #     limit: int | None = None,
 # ) -> list[int]:
-#     print(f"Authenticated with API key: {api_key}")
+#     LOGGER.debug(f"Authenticated with API key: {api_key}")
 #     if max_unix_timestamp < min_unix_timestamp:
 #         raise HTTPException(
 #             status_code=400,
