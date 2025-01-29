@@ -499,6 +499,8 @@ def match_search(
     is_high_skill_range_parties: bool | None = None,
     is_low_pri_pool: bool | None = None,
     is_new_player_pool: bool | None = None,
+    order_by: Literal["match_id", "start_time"] | None = None,
+    order: Literal["ASC", "DESC"] | None = None,
     limit: Annotated[int, Query(ge=1, le=100000)] = 1000,
 ) -> list[dict]:
     limiter.apply_limits(
@@ -523,6 +525,10 @@ def match_search(
     )
     if match_mode is None:
         match_mode = "Unranked,Ranked"
+    if order_by is None:
+        order_by = "match_id"
+    if order is None:
+        order = "ASC"
     query = f"""
     SELECT match_id, {select_list}
     FROM match_player mp FINAL
@@ -543,7 +549,7 @@ def match_search(
     AND (%(is_low_pri_pool)s IS NULL OR mi.low_pri_pool = %(is_low_pri_pool)s)
     AND (%(is_new_player_pool)s IS NULL OR mi.new_player_pool = %(is_new_player_pool)s)
     GROUP BY match_id
-    ORDER BY match_id
+    ORDER BY {order_by} {order}
     LIMIT %(limit)s
     """
     with CH_POOL.get_client() as client:
