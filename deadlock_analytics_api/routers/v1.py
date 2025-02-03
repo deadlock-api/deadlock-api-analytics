@@ -1306,6 +1306,8 @@ class HeroLanePerformance(BaseModel):
     max_net_worth_720s_1: int
     avg_net_worth_720s_2: float
     max_net_worth_720s_2: int
+    wins_1: int
+    wins_2: int
     matches_played: int
 
 
@@ -1372,6 +1374,8 @@ def get_hero_lane_performance(
                 max(mp1.stats.net_worth[4]) as max_net_worth_720s_1,
                 avg(mp2.stats.net_worth[4]) as avg_net_worth_720s_2,
                 max(mp2.stats.net_worth[4]) as max_net_worth_720s_2,
+                sum(mp1.won)                as wins_1,
+                sum(mp2.won)                as wins_2,
                 count()                     as matches_played
             FROM match_player mp1 FINAL
                 INNER JOIN match_info mi FINAL USING (match_id)
@@ -1395,7 +1399,7 @@ def get_hero_lane_performance(
             GROUP BY hero1, hero2, lane
             ORDER BY hero2, lane DESC;
         """
-        result = client.execute(
+        result, keys = client.execute(
             query,
             {
                 "hero_id": hero_id,
@@ -1408,29 +1412,6 @@ def get_hero_lane_performance(
                 "max_duration_s": max_duration_s,
                 "match_mode": match_mode,
             },
+            with_column_types=True,
         )
-    return [
-        HeroLanePerformance(
-            hero1=r[0],
-            hero2=r[1],
-            lane=r[2],
-            avg_net_worth_180s_1=r[3],
-            max_net_worth_180s_1=r[4],
-            avg_net_worth_180s_2=r[5],
-            max_net_worth_180s_2=r[6],
-            avg_net_worth_360s_1=r[7],
-            max_net_worth_360s_1=r[8],
-            avg_net_worth_360s_2=r[9],
-            max_net_worth_360s_2=r[10],
-            avg_net_worth_540s_1=r[11],
-            max_net_worth_540s_1=r[12],
-            avg_net_worth_540s_2=r[13],
-            max_net_worth_540s_2=r[14],
-            avg_net_worth_720s_1=r[15],
-            max_net_worth_720s_1=r[16],
-            avg_net_worth_720s_2=r[17],
-            max_net_worth_720s_2=r[18],
-            matches_played=r[19],
-        )
-        for r in result
-    ]
+    return [HeroLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
