@@ -1396,7 +1396,6 @@ def get_hero_lane_performance(
                 AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
                 AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
                 AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
-                AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
             GROUP BY hero1, hero2, lane
             ORDER BY hero2, lane DESC;
         """
