@@ -1336,6 +1336,7 @@ def get_hero_lane_performance(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
+    account_id = utils.validate_steam_id(account_id)
     with CH_POOL.get_client() as client:
         if min_unix_timestamp is not None:
             query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
