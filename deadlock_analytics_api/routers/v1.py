@@ -1284,3 +1284,153 @@ def post_win_rate_analysis(
     except Exception as e:
         print("Error in get_win_rate_analysis", e)
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+class HeroLanePerformance(BaseModel):
+    hero1: int
+    hero2: int
+    lane: Literal["solo", "duo"]
+    avg_net_worth_180s_1: float
+    max_net_worth_180s_1: int
+    avg_net_worth_180s_2: float
+    max_net_worth_180s_2: int
+    avg_net_worth_360s_1: float
+    max_net_worth_360s_1: int
+    avg_net_worth_360s_2: float
+    max_net_worth_360s_2: int
+    avg_net_worth_540s_1: float
+    max_net_worth_540s_1: int
+    avg_net_worth_540s_2: float
+    max_net_worth_540s_2: int
+    avg_net_worth_720s_1: float
+    max_net_worth_720s_1: int
+    avg_net_worth_720s_2: float
+    max_net_worth_720s_2: int
+    matches_played: int
+
+
+@router.get("/dev/hero/{hero_id}/lane-performance", summary="RateLimit: 100req/s")
+def get_hero_lane_performance(
+    req: Request,
+    res: Response,
+    hero_id: int,
+    account_id: Annotated[
+        int, Query(description="The account id of a player to search for")
+    ] = None,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Literal["Ranked", "Unranked"] | None = None,
+) -> list[HeroLanePerformance]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/dev/hero/{hero_id}/lane-performance",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    with CH_POOL.get_client() as client:
+        if min_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
+            result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
+            if len(result) >= 1:
+                min_match_id = (
+                    max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
+                )
+
+        if max_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
+            result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
+            if len(result) >= 1:
+                max_match_id = (
+                    min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
+                )
+
+        query = """
+            SELECT
+                mp1.hero_id                 as hero1,
+                mp2.hero_id                 as hero2,
+                if(mp1.assigned_lane IN (1,6), 'solo', 'duo') as lane,
+                avg(mp1.stats.net_worth[1]) as avg_net_worth_180s_1,
+                max(mp1.stats.net_worth[1]) as max_net_worth_180s_1,
+                avg(mp2.stats.net_worth[1]) as avg_net_worth_180s_2,
+                max(mp2.stats.net_worth[1]) as max_net_worth_180s_2,
+                avg(mp1.stats.net_worth[2]) as avg_net_worth_360s_1,
+                max(mp1.stats.net_worth[2]) as max_net_worth_360s_1,
+                avg(mp2.stats.net_worth[2]) as avg_net_worth_360s_2,
+                max(mp2.stats.net_worth[2]) as max_net_worth_360s_2,
+                avg(mp1.stats.net_worth[3]) as avg_net_worth_540s_1,
+                max(mp1.stats.net_worth[3]) as max_net_worth_540s_1,
+                avg(mp2.stats.net_worth[3]) as avg_net_worth_540s_2,
+                max(mp2.stats.net_worth[3]) as max_net_worth_540s_2,
+                avg(mp1.stats.net_worth[4]) as avg_net_worth_720s_1,
+                max(mp1.stats.net_worth[4]) as max_net_worth_720s_1,
+                avg(mp2.stats.net_worth[4]) as avg_net_worth_720s_2,
+                max(mp2.stats.net_worth[4]) as max_net_worth_720s_2,
+                count()                     as matches_played
+            FROM match_player mp1 FINAL
+                INNER JOIN match_info mi FINAL USING (match_id)
+                INNER JOIN match_player mp2 FINAL USING (match_id)
+            PREWHERE hero1 = %(hero_id)s
+            WHERE true
+                AND mp1.team != mp2.team
+                AND mp1.assigned_lane = mp2.assigned_lane
+                AND length(mp1.stats.net_worth) >= 4
+                AND length(mp2.stats.net_worth) >= 4
+                AND mi.match_outcome = 'TeamWin'
+                AND mi.match_mode IN ('Ranked', 'Unranked')
+                AND (%(account_id)s IS NULL OR mp1.account_id = %(account_id)s)
+                AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+                AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
+                AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
+                AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
+                AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+                AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+            GROUP BY hero1, hero2, lane
+            ORDER BY hero2, lane DESC;
+        """
+        result = client.execute(
+            query,
+            {
+                "hero_id": hero_id,
+                "account_id": account_id,
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+                "match_mode": match_mode,
+            },
+        )
+    return [
+        HeroLanePerformance(
+            hero1=r[0],
+            hero2=r[1],
+            lane=r[2],
+            avg_net_worth_180s_1=r[3],
+            max_net_worth_180s_1=r[4],
+            avg_net_worth_180s_2=r[5],
+            max_net_worth_180s_2=r[6],
+            avg_net_worth_360s_1=r[7],
+            max_net_worth_360s_1=r[8],
+            avg_net_worth_360s_2=r[9],
+            max_net_worth_360s_2=r[10],
+            avg_net_worth_540s_1=r[11],
+            max_net_worth_540s_1=r[12],
+            avg_net_worth_540s_2=r[13],
+            max_net_worth_540s_2=r[14],
+            avg_net_worth_720s_1=r[15],
+            max_net_worth_720s_1=r[16],
+            avg_net_worth_720s_2=r[17],
+            max_net_worth_720s_2=r[18],
+            matches_played=r[19],
+        )
+        for r in result
+    ]
