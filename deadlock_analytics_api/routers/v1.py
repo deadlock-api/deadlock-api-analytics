@@ -1306,6 +1306,7 @@ class HeroLanePerformance(BaseModel):
     max_net_worth_720s_1: int
     avg_net_worth_720s_2: float
     max_net_worth_720s_2: int
+    match_ids: list[int]
     wins_1: int
     wins_2: int
     matches_played: int
@@ -1359,25 +1360,26 @@ def get_hero_lane_performance(
                 mp1.hero_id                 as hero1,
                 mp2.hero_id                 as hero2,
                 if(mp1.assigned_lane IN (1,6), 'solo', 'duo') as lane,
-                avg(mp1.stats.net_worth[1]) as avg_net_worth_180s_1,
-                max(mp1.stats.net_worth[1]) as max_net_worth_180s_1,
-                avg(mp2.stats.net_worth[1]) as avg_net_worth_180s_2,
-                max(mp2.stats.net_worth[1]) as max_net_worth_180s_2,
-                avg(mp1.stats.net_worth[2]) as avg_net_worth_360s_1,
-                max(mp1.stats.net_worth[2]) as max_net_worth_360s_1,
-                avg(mp2.stats.net_worth[2]) as avg_net_worth_360s_2,
-                max(mp2.stats.net_worth[2]) as max_net_worth_360s_2,
-                avg(mp1.stats.net_worth[3]) as avg_net_worth_540s_1,
-                max(mp1.stats.net_worth[3]) as max_net_worth_540s_1,
-                avg(mp2.stats.net_worth[3]) as avg_net_worth_540s_2,
-                max(mp2.stats.net_worth[3]) as max_net_worth_540s_2,
-                avg(mp1.stats.net_worth[4]) as avg_net_worth_720s_1,
-                max(mp1.stats.net_worth[4]) as max_net_worth_720s_1,
-                avg(mp2.stats.net_worth[4]) as avg_net_worth_720s_2,
-                max(mp2.stats.net_worth[4]) as max_net_worth_720s_2,
-                sum(mp1.won)                as wins_1,
-                sum(mp2.won)                as wins_2,
-                count()                     as matches_played
+                avg(mp1.stats.net_worth[1])  as avg_net_worth_180s_1,
+                max(mp1.stats.net_worth[1])  as max_net_worth_180s_1,
+                avg(mp2.stats.net_worth[1])  as avg_net_worth_180s_2,
+                max(mp2.stats.net_worth[1])  as max_net_worth_180s_2,
+                avg(mp1.stats.net_worth[2])  as avg_net_worth_360s_1,
+                max(mp1.stats.net_worth[2])  as max_net_worth_360s_1,
+                avg(mp2.stats.net_worth[2])  as avg_net_worth_360s_2,
+                max(mp2.stats.net_worth[2])  as max_net_worth_360s_2,
+                avg(mp1.stats.net_worth[3])  as avg_net_worth_540s_1,
+                max(mp1.stats.net_worth[3])  as max_net_worth_540s_1,
+                avg(mp2.stats.net_worth[3])  as avg_net_worth_540s_2,
+                max(mp2.stats.net_worth[3])  as max_net_worth_540s_2,
+                avg(mp1.stats.net_worth[4])  as avg_net_worth_720s_1,
+                max(mp1.stats.net_worth[4])  as max_net_worth_720s_1,
+                avg(mp2.stats.net_worth[4])  as avg_net_worth_720s_2,
+                max(mp2.stats.net_worth[4])  as max_net_worth_720s_2,
+                groupUniqArray(mp1.match_id) as match_ids,
+                sum(mp1.won)                 as wins_1,
+                sum(mp2.won)                 as wins_2,
+                count()                      as matches_played
             FROM match_player mp1 FINAL
                 INNER JOIN match_info mi FINAL USING (match_id)
                 INNER JOIN match_player mp2 FINAL USING (match_id)
