@@ -1328,7 +1328,12 @@ def get_hero_lane_performance(
     max_badge_level: Annotated[int | None, Query(le=116)] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
+    match_mode: Annotated[
+        str | None,
+        Query(
+            description="Comma seperated List; Possible values: Unranked, PrivateLobby, CoopBot, Ranked, ServerTest, Tutorial, HeroLabs; Default: Unranked,Ranked",
+        ),
+    ] = None,
 ) -> list[HeroLanePerformance]:
     limiter.apply_limits(
         req,
@@ -1338,6 +1343,8 @@ def get_hero_lane_performance(
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
     account_id = utils.validate_steam_id(account_id)
+    if match_mode is None:
+        match_mode = "Unranked,Ranked"
     with CH_POOL.get_client() as client:
         if min_unix_timestamp is not None:
             query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
@@ -1390,7 +1397,6 @@ def get_hero_lane_performance(
                 AND length(mp1.stats.net_worth) >= 4
                 AND length(mp2.stats.net_worth) >= 4
                 AND mi.match_outcome = 'TeamWin'
-                AND mi.match_mode IN ('Ranked', 'Unranked')
                 AND (%(account_id)s IS NULL OR mp1.account_id = %(account_id)s)
                 AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
                 AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
@@ -1398,6 +1404,7 @@ def get_hero_lane_performance(
                 AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
                 AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
                 AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
             GROUP BY hero1, hero2, lane
             ORDER BY hero2, lane DESC;
         """
@@ -1412,7 +1419,7 @@ def get_hero_lane_performance(
                 "max_match_id": max_match_id,
                 "min_duration_s": min_duration_s,
                 "max_duration_s": max_duration_s,
-                "match_mode": match_mode,
+                "match_mode": match_mode.split(",") if match_mode is not None else None,
             },
             with_column_types=True,
         )
