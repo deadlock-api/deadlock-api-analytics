@@ -1306,7 +1306,6 @@ class HeroLanePerformance(BaseModel):
     max_net_worth_720s_1: int
     avg_net_worth_720s_2: float
     max_net_worth_720s_2: int
-    match_ids: list[int]
     wins_1: int
     wins_2: int
     matches_played: int
@@ -1383,7 +1382,6 @@ def get_hero_lane_performance(
                 max(mp1.stats.net_worth[4])  as max_net_worth_720s_1,
                 avg(mp2.stats.net_worth[4])  as avg_net_worth_720s_2,
                 max(mp2.stats.net_worth[4])  as max_net_worth_720s_2,
-                groupUniqArray(mp1.match_id) as match_ids,
                 sum(mp1.won)                 as wins_1,
                 sum(mp2.won)                 as wins_2,
                 count()                      as matches_played
@@ -1424,3 +1422,182 @@ def get_hero_lane_performance(
             with_column_types=True,
         )
     return [HeroLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+
+
+class HeroDuoLanePerformance(BaseModel):
+    hero1: int
+    hero2: int
+    hero3: int
+    hero4: int
+    avg_net_worth_180s_1: float
+    max_net_worth_180s_1: int
+    avg_net_worth_180s_2: float
+    max_net_worth_180s_2: int
+    avg_net_worth_180s_3: float
+    max_net_worth_180s_3: int
+    avg_net_worth_180s_4: float
+    max_net_worth_180s_4: int
+    avg_net_worth_360s_1: float
+    max_net_worth_360s_1: int
+    avg_net_worth_360s_2: float
+    max_net_worth_360s_2: int
+    avg_net_worth_360s_3: float
+    max_net_worth_360s_3: int
+    avg_net_worth_360s_4: float
+    max_net_worth_360s_4: int
+    avg_net_worth_540s_1: float
+    max_net_worth_540s_1: int
+    avg_net_worth_540s_2: float
+    max_net_worth_540s_2: int
+    avg_net_worth_540s_3: float
+    max_net_worth_540s_3: int
+    avg_net_worth_540s_4: float
+    max_net_worth_540s_4: int
+    avg_net_worth_720s_1: float
+    max_net_worth_720s_1: int
+    avg_net_worth_720s_2: float
+    max_net_worth_720s_2: int
+    avg_net_worth_720s_3: float
+    max_net_worth_720s_3: int
+    avg_net_worth_720s_4: float
+    max_net_worth_720s_4: int
+    wins_1: int
+    wins_3: int
+    matches_played: int
+
+
+@router.get("/dev/hero/{hero1_id}/{hero2_id}/duo-lane-performance", summary="RateLimit: 100req/s")
+def get_hero_duo_lane_performance(
+    req: Request,
+    res: Response,
+    hero1_id: int,
+    hero2_id: int,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+    match_mode: Annotated[
+        str | None,
+        Query(
+            description="Comma seperated List; Possible values: Unranked, PrivateLobby, CoopBot, Ranked, ServerTest, Tutorial, HeroLabs; Default: Unranked,Ranked",
+        ),
+    ] = None,
+) -> list[HeroDuoLanePerformance]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/dev/hero/{hero1_id}/{hero2_id}/duo-lane-performance",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    if match_mode is None:
+        match_mode = "Unranked,Ranked"
+    with CH_POOL.get_client() as client:
+        if min_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
+            result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
+            if len(result) >= 1:
+                min_match_id = (
+                    max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
+                )
+
+        if max_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
+            result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
+            if len(result) >= 1:
+                max_match_id = (
+                    min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
+                )
+
+        query = """
+            SELECT
+                mp1.hero_id                 as hero1,
+                mp2.hero_id                 as hero2,
+                mp3.hero_id                 as hero3,
+                mp4.hero_id                 as hero4,
+                avg(mp1.stats.net_worth[1])  as avg_net_worth_180s_1,
+                max(mp1.stats.net_worth[1])  as max_net_worth_180s_1,
+                avg(mp2.stats.net_worth[1])  as avg_net_worth_180s_2,
+                max(mp2.stats.net_worth[1])  as max_net_worth_180s_2,
+                avg(mp3.stats.net_worth[1])  as avg_net_worth_180s_3,
+                max(mp3.stats.net_worth[1])  as max_net_worth_180s_3,
+                avg(mp4.stats.net_worth[1])  as avg_net_worth_180s_4,
+                max(mp4.stats.net_worth[1])  as max_net_worth_180s_4,
+                avg(mp1.stats.net_worth[2])  as avg_net_worth_360s_1,
+                max(mp1.stats.net_worth[2])  as max_net_worth_360s_1,
+                avg(mp2.stats.net_worth[2])  as avg_net_worth_360s_2,
+                max(mp2.stats.net_worth[2])  as max_net_worth_360s_2,
+                avg(mp3.stats.net_worth[2])  as avg_net_worth_360s_3,
+                max(mp3.stats.net_worth[2])  as max_net_worth_360s_3,
+                avg(mp4.stats.net_worth[2])  as avg_net_worth_360s_4,
+                max(mp4.stats.net_worth[2])  as max_net_worth_360s_4,
+                avg(mp1.stats.net_worth[3])  as avg_net_worth_540s_1,
+                max(mp1.stats.net_worth[3])  as max_net_worth_540s_1,
+                avg(mp2.stats.net_worth[3])  as avg_net_worth_540s_2,
+                max(mp2.stats.net_worth[3])  as max_net_worth_540s_2,
+                avg(mp3.stats.net_worth[3])  as avg_net_worth_540s_3,
+                max(mp3.stats.net_worth[3])  as max_net_worth_540s_3,
+                avg(mp4.stats.net_worth[3])  as avg_net_worth_540s_4,
+                max(mp4.stats.net_worth[3])  as max_net_worth_540s_4,
+                avg(mp1.stats.net_worth[4])  as avg_net_worth_720s_1,
+                max(mp1.stats.net_worth[4])  as max_net_worth_720s_1,
+                avg(mp2.stats.net_worth[4])  as avg_net_worth_720s_2,
+                max(mp2.stats.net_worth[4])  as max_net_worth_720s_2,
+                avg(mp3.stats.net_worth[4])  as avg_net_worth_720s_3,
+                max(mp3.stats.net_worth[4])  as max_net_worth_720s_3,
+                avg(mp4.stats.net_worth[4])  as avg_net_worth_720s_4,
+                max(mp4.stats.net_worth[4])  as max_net_worth_720s_4,
+                sum(mp1.won)                 as wins_1,
+                sum(mp3.won)                 as wins_3,
+                count()                      as matches_played
+            FROM match_player mp1 FINAL
+                INNER JOIN match_info mi FINAL USING (match_id)
+                INNER JOIN match_player mp2 FINAL USING (match_id)
+                INNER JOIN match_player mp3 FINAL USING (match_id)
+                INNER JOIN match_player mp4 FINAL USING (match_id)
+            WHERE true
+                AND hero1 = %(hero1_id)s
+                AND hero2 = %(hero2_id)s
+                AND mp1.team = mp2.team
+                AND mp1.account_id != mp2.account_id
+                AND mp3.team = mp4.team
+                AND mp3.account_id != mp4.account_id
+                AND mp1.team != mp3.team
+                AND mp1.assigned_lane = mp2.assigned_lane
+                AND mp1.assigned_lane = mp3.assigned_lane
+                AND mp1.assigned_lane = mp4.assigned_lane
+                AND length(mp1.stats.net_worth) >= 4
+                AND length(mp2.stats.net_worth) >= 4
+                AND length(mp3.stats.net_worth) >= 4
+                AND length(mp4.stats.net_worth) >= 4
+                AND mi.match_outcome = 'TeamWin'
+                AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+                AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
+                AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
+                AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
+                AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+                AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
+            GROUP BY hero1, hero2, hero3, hero4
+            ORDER BY hero2, hero3, hero4;
+        """
+        result, keys = client.execute(
+            query,
+            {
+                "hero1_id": hero1_id,
+                "hero2_id": hero2_id,
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+                "match_mode": match_mode.split(",") if match_mode is not None else None,
+            },
+            with_column_types=True,
+        )
+    return [HeroDuoLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
