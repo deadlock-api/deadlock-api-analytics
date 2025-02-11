@@ -108,7 +108,8 @@ def get_match_score_distribution(req: Request, res: Response) -> list[MatchScore
     FROM finished_matches
     WHERE start_time > '2024-10-11 06:00:00'
     GROUP BY score
-    ORDER BY score;
+    ORDER BY score
+    LIMIT 1 by match_id;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
@@ -145,6 +146,7 @@ def get_match_badge_level_distribution(
         FROM finished_matches
         WHERE (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+        LIMIT 1 BY match_id
 
         UNION ALL
 
@@ -596,7 +598,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
-    FROM finished_matches
+    FROM finished_matches FINAL
     WHERE match_id = %(match_id)s
     LIMIT 1
     """
@@ -698,7 +700,7 @@ def get_all_finished_matches(
         max_match_score = 5000
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
-    FROM finished_matches
+    FROM finished_matches FINAL
     ARRAY JOIN players
     WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
     AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
@@ -772,6 +774,7 @@ def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> l
     FROM finished_matches
     ARRAY JOIN players
     WHERE players.account_id = %(account_id)s
+    LIMIT 1 BY match_id
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"account_id": account_id})
@@ -817,7 +820,7 @@ def get_hero_win_loss_stats(
     SELECT `players.hero_id`                  as hero_id,
             countIf(`players.team` == winner) AS wins,
             countIf(`players.team` != winner) AS losses
-    FROM finished_matches
+    FROM finished_matches FINAL
         ARRAY JOIN players
     WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
