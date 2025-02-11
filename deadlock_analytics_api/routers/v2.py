@@ -563,7 +563,7 @@ def get_hero_item_win_loss_stats_cached(
         item_id,
         countIf(won) AS wins,
         countIf(NOT won) AS losses
-    FROM match_player_item
+    FROM match_player_item_v2
     INNER JOIN match_info mi USING (match_id)
     INNER JOIN player p USING (account_id)
     WHERE TRUE
@@ -571,8 +571,8 @@ def get_hero_item_win_loss_stats_cached(
     AND mi.match_mode IN ('Ranked', 'Unranked')
     AND %(hero_id)s = hero_id
     AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
-    AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-    AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+    AND (%(min_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+    AND (%(max_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
@@ -615,15 +615,15 @@ def get_item_win_loss_stats_cached(
         item_id,
         countIf(won) AS wins,
         countIf(NOT won) AS losses
-    FROM match_player_item
+    FROM match_player_item_v2
     INNER JOIN match_info mi USING (match_id)
     INNER JOIN player p USING (account_id)
     WHERE TRUE
     AND mi.match_outcome = 'TeamWin'
     AND mi.match_mode IN ('Ranked', 'Unranked')
     AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
-    AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-    AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+    AND (%(min_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+    AND (%(max_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
@@ -801,7 +801,7 @@ def get_player_item_stats_batch(
             item_id,
             count(*) AS matches,
             countIf(won) AS wins
-        FROM match_player_item
+        FROM match_player_item_v2
         INNER JOIN default.match_info AS mi USING (match_id)
         WHERE account_id IN %(account_ids)s
         AND mi.match_outcome = 'TeamWin'
