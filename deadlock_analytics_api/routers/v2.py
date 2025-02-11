@@ -42,7 +42,7 @@ def get_leaderboard(
     res: Response,
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
-    sort_by: Literal["winrate", "wins", "matches"] | None = None,
+    sort_by: Literal["winrate", "wins", "matches", "matches_played"] | None = None,
     account_id: int | None = None,
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(req, res, "/v2/leaderboard", [RateLimit(limit=100, period=1)])
@@ -97,7 +97,7 @@ def get_leaderboard_by_region(
     region: Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"],
     start: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(le=10000)] = 1000,
-    sort_by: Literal["winrate", "wins", "matches"] | None = None,
+    sort_by: Literal["winrate", "wins", "matches", "matches_played"] | None = None,
 ) -> list[PlayerLeaderboardV2]:
     limiter.apply_limits(req, res, "/v2/leaderboard/{region}", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=300"
