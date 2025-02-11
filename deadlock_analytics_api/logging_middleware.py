@@ -9,8 +9,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from deadlock_analytics_api.utils import AsyncIteratorWrapper
-
 
 class RouterLoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: FastAPI, *, logger: logging.Logger) -> None:
@@ -61,8 +59,6 @@ class RouterLoggingMiddleware(BaseHTTPMiddleware):
                 "status_code": res.status_code,
                 "time_taken": f"{execution_time:0.4f}s",
             }
-            resp_body = [section async for section in res.__dict__["body_iterator"]]
-            res.__setattr__("body_iterator", AsyncIteratorWrapper(resp_body))
         else:
             res_logging = {"status": "failed", "status_code": 500}
         return res, res_logging
