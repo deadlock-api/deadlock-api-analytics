@@ -8,6 +8,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
+from deadlock_analytics_api.logging_middleware import RouterLoggingMiddleware
 from deadlock_analytics_api.routers import internal, v1, v2
 
 # Doesn't use AppConfig because logging is critical
@@ -35,6 +36,8 @@ logging.getLogger("boto3").setLevel(logging.WARNING)
 logging.getLogger("botocore").setLevel(logging.WARNING)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("clickhouse_driver").setLevel(logging.WARNING)
+
+LOGGER = logging.getLogger(__name__)
 
 if "SENTRY_DSN" in os.environ:
     import sentry_sdk
@@ -65,6 +68,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+app.add_middleware(RouterLoggingMiddleware, logger=LOGGER)
 
 instrumentator = Instrumentator(should_group_status_codes=False).instrument(app)
 
