@@ -27,6 +27,7 @@ class RouterLoggingMiddleware(BaseHTTPMiddleware):
             await self.set_body(req)
             res, res_dict = await self._log_response(call_next, req, request_id)
             request_dict = await self._log_request(req)
+            self._logger.debug(request_dict)
             logging_dict.update({"request": request_dict, "response": res_dict})
         except Exception as e:
             self._logger.exception(e)
