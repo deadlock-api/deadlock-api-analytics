@@ -55,6 +55,7 @@ def get_leaderboard(
         "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
         "wins": "ORDER BY rank, wins DESC, account_id",
         "matches": "ORDER BY rank, matches_played DESC, account_id",
+        "matches_played": "matches_played DESC, rank",
     }[sort_by or "winrate"]
     query = f"""
     SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
@@ -104,6 +105,7 @@ def get_leaderboard_by_region(
         "winrate": "ORDER BY rank, wins / greatest(1, matches_played) DESC, account_id",
         "wins": "ORDER BY rank, wins DESC, account_id",
         "matches": "ORDER BY rank, matches_played DESC, account_id",
+        "matches_played": "matches_played DESC, rank",
     }[sort_by or "winrate"]
     query = f"""
     SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
