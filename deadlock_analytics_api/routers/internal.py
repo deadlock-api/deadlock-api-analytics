@@ -136,7 +136,7 @@ def get_recent_matches(
     LOGGER.debug(f"Authenticated with API key: {api_key}")
     query = """
     SELECT DISTINCT match_id
-    FROM finished_matches FINAL
+    FROM finished_matches
     WHERE start_time < now() - INTERVAL '3 hours'
         AND start_time > now() - INTERVAL '7 days'
         AND match_id NOT IN (SELECT match_id FROM match_salts)

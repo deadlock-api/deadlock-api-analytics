@@ -598,7 +598,7 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     res.headers["Cache-Control"] = "public, max-age=1200"
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
-    FROM finished_matches FINAL
+    FROM finished_matches
     WHERE match_id = %(match_id)s
     LIMIT 1
     """
@@ -700,7 +700,7 @@ def get_all_finished_matches(
         max_match_score = 5000
     query = f"""
     SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
-    FROM finished_matches FINAL
+    FROM finished_matches
     ARRAY JOIN players
     WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
     AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
@@ -820,7 +820,7 @@ def get_hero_win_loss_stats(
     SELECT `players.hero_id`                  as hero_id,
             countIf(`players.team` == winner) AS wins,
             countIf(`players.team` != winner) AS losses
-    FROM finished_matches FINAL
+    FROM finished_matches
         ARRAY JOIN players
     WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
     AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
