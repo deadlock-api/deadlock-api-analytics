@@ -23,7 +23,6 @@ ACTIVE_MATCHES_KEYS = [
     "match_score",
     "region_mode",
     "scraped_at",
-    "compat_version",
     "ranked_badge_level",
 ]
 
@@ -43,7 +42,6 @@ ACTIVE_MATCHES_REDUCED_KEYS = [
     "match_score",
     "region_mode",
     "winner",
-    "compat_version",
     "ranked_badge_level",
 ]
 
@@ -118,7 +116,6 @@ class ActiveMatch(BaseModel):
     region_mode: str
     objectives_mask_team0: int
     objectives_mask_team1: int
-    compat_version: int | None = Field(None)
     ranked_badge_level: int | None = Field(None)
 
     @field_validator("start_time", "scraped_at", mode="before")
