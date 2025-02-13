@@ -23,7 +23,6 @@ ACTIVE_MATCHES_KEYS = [
     "match_score",
     "region_mode",
     "scraped_at",
-    "ranked_badge_level",
 ]
 
 ACTIVE_MATCHES_REDUCED_KEYS = [
@@ -42,7 +41,6 @@ ACTIVE_MATCHES_REDUCED_KEYS = [
     "match_score",
     "region_mode",
     "winner",
-    "ranked_badge_level",
 ]
 
 
