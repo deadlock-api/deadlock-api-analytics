@@ -1629,6 +1629,43 @@ def get_net_worth_win_rate_analysis(
         [RateLimit(limit=100, period=1)],
     )
     res.headers["Cache-Control"] = "public, max-age=3600"
+    if (
+        max_duration_s is not None
+        and min_duration_s is not None
+        and max_duration_s < min_duration_s
+    ):
+        raise HTTPException(
+            status_code=400, detail="max_duration_s must be greater than min_duration_s"
+        )
+    if (
+        max_badge_level is not None
+        and min_badge_level is not None
+        and max_badge_level < min_badge_level
+    ):
+        raise HTTPException(
+            status_code=400, detail="max_badge_level must be greater than min_badge_level"
+        )
+    if (
+        max_networth_advantage is not None
+        and min_networth_advantage is not None
+        and max_networth_advantage < min_networth_advantage
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="max_networth_advantage must be greater than min_networth_advantage",
+        )
+    if max_match_id is not None and min_match_id is not None and max_match_id < min_match_id:
+        raise HTTPException(
+            status_code=400, detail="max_match_id must be greater than min_match_id"
+        )
+    if (
+        max_unix_timestamp is not None
+        and min_unix_timestamp is not None
+        and max_unix_timestamp < min_unix_timestamp
+    ):
+        raise HTTPException(
+            status_code=400, detail="max_unix_timestamp must be greater than min_unix_timestamp"
+        )
     time_stamps = [
         180,
         360,
