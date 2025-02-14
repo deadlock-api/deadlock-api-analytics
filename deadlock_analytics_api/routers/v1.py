@@ -1604,3 +1604,135 @@ def get_hero_duo_lane_performance(
             with_column_types=True,
         )
     return [HeroDuoLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+
+
+@router.get("/dev/net-worth-win-rate-analysis/{game_time}", summary="RateLimit: 100req/s")
+def get_net_worth_win_rate_analysis(
+    req: Request,
+    res: Response,
+    game_time: int,
+    min_match_id: Annotated[int | None, Query(ge=0)] = None,
+    max_match_id: int | None = None,
+    min_networth_advantage: Annotated[int | None, Query(ge=0)] = None,
+    max_networth_advantage: int | None = None,
+    min_duration_s: Annotated[int | None, Query(ge=0)] = None,
+    max_duration_s: Annotated[int | None, Query(le=7000)] = None,
+    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+    max_badge_level: Annotated[int | None, Query(le=116)] = None,
+    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+    max_unix_timestamp: int | None = None,
+) -> dict[str, int | float]:
+    limiter.apply_limits(
+        req,
+        res,
+        "/v1/dev/net-worth-win-rate-analysis",
+        [RateLimit(limit=100, period=1)],
+    )
+    res.headers["Cache-Control"] = "public, max-age=3600"
+    time_stamps = [
+        180,
+        360,
+        540,
+        720,
+        900,
+        1200,
+        1500,
+        1800,
+        2100,
+        2400,
+        2700,
+        3000,
+        3300,
+        3600,
+        3900,
+        4200,
+        4500,
+        4800,
+        5100,
+        5400,
+        5700,
+        6000,
+        6300,
+        6600,
+        6900,
+        7200,
+        7500,
+        7800,
+        8100,
+        8400,
+        8700,
+        9000,
+        9300,
+        9600,
+        9900,
+        10200,
+        10460,
+    ]
+    try:
+        game_time_index = time_stamps.index(game_time)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid game_time, choose from {time_stamps}")
+    min_duration_s = max(min_duration_s, game_time) if min_duration_s is not None else game_time
+    with CH_POOL.get_client() as client:
+        if min_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
+            result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
+            if len(result) >= 1:
+                min_match_id = (
+                    max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
+                )
+
+        if max_unix_timestamp is not None:
+            query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
+            result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
+            if len(result) >= 1:
+                max_match_id = (
+                    min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
+                )
+
+        query = """
+WITH net_worth_diff AS (
+    SELECT mi.match_id,
+        sum(if(mp.team = 'Team0', 1, 0) * mp.stats.net_worth[%(game_time_index)s]) as team0_net_worth,
+        sum(if(mp.team = 'Team1', 1, 0) * mp.stats.net_worth[%(game_time_index)s]) as team1_net_worth,
+        any(mi.winning_team)                                                       as winning_team
+    FROM match_info mi FINAL
+        INNER JOIN match_player mp FINAL USING match_id
+    WHERE TRUE
+    AND mi.game_mode = 'Normal'
+    AND mi.match_outcome = 'TeamWin'
+    AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+    AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
+    AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
+    AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
+    AND (%(min_badge_level)s IS NULL OR (mp.ranked_badge_level IS NOT NULL AND mp.ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+    AND (%(max_badge_level)s IS NULL OR (mp.ranked_badge_level IS NOT NULL AND mp.ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+    GROUP BY mi.match_id
+)
+SELECT
+    avg(team0_net_worth >= team1_net_worth AND winning_team = 'Team0' OR
+        team1_net_worth >= team0_net_worth AND winning_team = 'Team1') as richer_wins,
+    count(*)                                                           as matches
+FROM net_worth_diff
+WHERE TRUE
+    AND (%(min_networth_advantage)s IS NULL OR abs(team0_net_worth - team1_net_worth) >= %(min_networth_advantage)s)
+    AND (%(max_networth_advantage)s IS NULL OR abs(team0_net_worth - team1_net_worth) <= %(max_networth_advantage)s)
+        """
+        result, keys = client.execute(
+            query,
+            {
+                "game_time_index": game_time_index + 1,
+                "min_networth_advantage": min_networth_advantage,
+                "max_networth_advantage": max_networth_advantage,
+                "min_badge_level": min_badge_level,
+                "max_badge_level": max_badge_level,
+                "min_match_id": min_match_id,
+                "max_match_id": max_match_id,
+                "min_duration_s": min_duration_s,
+                "max_duration_s": max_duration_s,
+            },
+            with_column_types=True,
+        )
+    if len(result) == 0:
+        return {"richer_wins": 0, "matches": 0}
+    return {k: v for (k, _), v in zip(keys, result[0])}
