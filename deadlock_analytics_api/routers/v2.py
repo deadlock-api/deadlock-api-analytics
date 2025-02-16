@@ -1121,6 +1121,7 @@ def get_matches_by_account_id(
     min_duration_s: Annotated[int | None, Query(ge=0)] = None,
     max_duration_s: Annotated[int | None, Query(le=7000)] = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
+    without_avg_badge: bool | None = None,
 ) -> list[dict]:
     limiter.apply_limits(
         req,
@@ -1130,19 +1131,23 @@ def get_matches_by_account_id(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     account_id = utils.validate_steam_id(account_id)
-    query = """
-    SELECT
-        DISTINCT ON(pmh.match_id) pmh.* EXCEPT (created_at),
+    if without_avg_badge:
+        select = "pmh.* EXCEPT (created_at)"
+    else:
+        select = """
+        pmh.* EXCEPT (created_at),
         toBool(mi.match_id > 0) AS has_metadata,
         mi.match_id IS NOT null ? intDivOrZero(mi.average_badge_team0 + mi.average_badge_team1, 2): null AS average_match_badge,
         round(avg(average_match_badge) OVER (ORDER BY match_id DESC ROWS BETWEEN CURRENT ROW AND 10 FOLLOWING), 2) AS moving_average_match_badge,
         round(median(average_match_badge) OVER (ORDER BY match_id DESC ROWS BETWEEN CURRENT ROW AND 10 FOLLOWING), 2) AS moving_median_match_badge
+        """
+    query = f"""
+    SELECT {select}
     FROM player_match_history pmh FINAL
-    LEFT JOIN match_info mi USING (match_id)
+    {"" if without_avg_badge else "LEFT JOIN match_info mi FINAL USING (match_id)"}
     WHERE account_id = %(account_id)s
-    AND mi.match_outcome = 'TeamWin'
     AND pmh.match_mode IN ('Ranked', 'Unranked')
-    AND (%(has_metadata)s IS NULL OR toBool(mi.match_id > 0) = %(has_metadata)s)
+    {"" if without_avg_badge else "AND (%(has_metadata)s IS NULL OR toBool(mi.match_id > 0) = %(has_metadata)s)"}
     AND (%(min_unix_timestamp)s IS NULL OR pmh.start_time >= toDateTime(%(min_unix_timestamp)s))
     AND (%(max_unix_timestamp)s IS NULL OR pmh.start_time <= toDateTime(%(max_unix_timestamp)s))
     AND (%(min_match_id)s IS NULL OR pmh.match_id >= %(min_match_id)s)
