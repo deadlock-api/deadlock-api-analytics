@@ -35,7 +35,7 @@ def get_missing_matches(
     limiter.apply_limits(req, res, "/v1/missing-matches", [RateLimit(limit=100, period=1)])
     query = """
     WITH matches AS (
-        SELECT DISTINCT match_id, toUnixTimestamp(start_time) AS start_time FROM finished_matches LIMIT 1 BY match_id
+        SELECT DISTINCT match_id, toUnixTimestamp(start_time) AS start_time FROM finished_matches
         UNION DISTINCT
         SELECT DISTINCT match_id, start_time FROM player_match_history FINAL
         WHERE match_mode IN ('Ranked', 'Unranked')

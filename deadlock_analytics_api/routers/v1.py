@@ -108,8 +108,7 @@ def get_match_score_distribution(req: Request, res: Response) -> list[MatchScore
     FROM finished_matches
     WHERE start_time > '2024-10-11 06:00:00'
     GROUP BY score
-    ORDER BY score
-    LIMIT 1 by match_id;
+    ORDER BY score;
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query)
@@ -146,7 +145,6 @@ def get_match_badge_level_distribution(
         FROM finished_matches
         WHERE (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-        LIMIT 1 BY match_id
 
         UNION ALL
 
@@ -774,7 +772,6 @@ def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> l
     FROM finished_matches
     ARRAY JOIN players
     WHERE players.account_id = %(account_id)s
-    LIMIT 1 BY match_id
     """
     with CH_POOL.get_client() as client:
         result = client.execute(query, {"account_id": account_id})
