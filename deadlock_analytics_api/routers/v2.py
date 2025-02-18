@@ -440,7 +440,7 @@ def get_hero_matchups_win_loss_stats(
                 "region": region,
             },
         )
-    matchups = defaultdict(lambda: list())
+    matchups = defaultdict(list)
     for (
         hero0,
         hero1,
