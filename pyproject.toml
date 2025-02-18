@@ -12,11 +12,15 @@ dependencies = [
     "clickhouse-pool>=0.6.0",
     "fastapi>=0.115.5",
     "granian<1.7.0",
+    "langchain-google-genai>=2.0.9",
+    "langchain>=0.3.19",
+    "langgraph>=0.2.73",
     "prometheus-fastapi-instrumentator>=7.0.0",
     "psycopg2-binary>=2.9.10",
     "redis[hiredis]>=5.2.0",
     "requests>=2.32.3",
     "sentry-sdk[fastapi]>=2.19.0",
+    "sqlglot>=26.6.0",
     "uuid>=1.30",
 ]
 
