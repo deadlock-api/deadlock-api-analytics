@@ -84,10 +84,11 @@ app.include_router(v1.no_tagged_router)
 app.include_router(internal.router)
 app.include_router(internal.no_key_router)
 
-try:
-    app.include_router(v1_chat.router)
-except:  # noqa: E722
-    LOGGER.warning("Failed to import v1_chat router")
+if os.environ.get("ENABLE_CHAT", "false").lower() == "true":
+    try:
+        app.include_router(v1_chat.router)
+    except:  # noqa: E722
+        LOGGER.warning("Failed to import v1_chat router")
 
 
 @app.get("/", include_in_schema=False)
