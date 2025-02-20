@@ -855,7 +855,7 @@ def get_player_item_stats(
     return get_player_item_stats_batch(
         req,
         res,
-        account_ids=str(account_id),
+        account_ids=str(utils.validate_steam_id(account_id)),
         hero_id=hero_id,
         item_id=item_id,
         min_unix_timestamp=min_unix_timestamp,
