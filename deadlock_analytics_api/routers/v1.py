@@ -1207,7 +1207,7 @@ def post_win_rate_analysis(
         [RateLimit(limit=10, period=60)],
     )
 
-    START_TIME = "2025-01-17"
+    START_TIME = "2025-02-11"
     try:
         with CH_POOL.get_client() as client:
 
