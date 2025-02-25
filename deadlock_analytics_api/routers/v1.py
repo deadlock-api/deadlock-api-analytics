@@ -26,72 +26,18 @@ router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
 
 
-class TableSize(BaseModel):
-    rows: int
-    is_view: bool
-    data_compressed_bytes: int
-    data_uncompressed_bytes: int
-
-
-class APIInfo(BaseModel):
-    table_sizes: dict[str, TableSize]
-    fetched_matches_per_day: int
-
-
-@router.get("/info", summary="RateLimit: 100req/s")
-def get_api_info(req: Request, res: Response) -> APIInfo:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/info",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT
-        name                     AS table,
-        toBool(parts IS NULL)    AS is_view,
-        total_rows               AS rows,
-        total_bytes              AS data_compressed_bytes,
-        total_bytes_uncompressed AS data_uncompressed_bytes
-    FROM system.tables
-    WHERE database = 'default'
-        AND name NOT LIKE 'system.%'
-        AND name NOT LIKE '%inner%'
-        AND total_rows IS NOT NULL
-        AND total_bytes IS NOT NULL
-        AND total_bytes_uncompressed IS NOT NULL
-    ORDER BY table;
-    """
-    query2 = """
-    WITH fetched_matches AS (
-        SELECT match_id
-        FROM match_info
-        WHERE created_at > now() - INTERVAL 1 DAY
-        UNION
-        DISTINCT
-        SELECT match_id
-        FROM match_salts
-        WHERE created_at > now() - INTERVAL 1 DAY
-    )
-    SELECT COUNT() as fetched_matches_per_day
-    FROM fetched_matches;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query)
-        result2 = client.execute(query2)
-    return APIInfo(
-        table_sizes={
-            r[0]: TableSize(
-                is_view=r[1],
-                rows=r[2],
-                data_compressed_bytes=r[3],
-                data_uncompressed_bytes=r[4],
-            )
-            for r in result
-        },
-        fetched_matches_per_day=result2[0][0],
-    )
+@router.get(
+    "/info",
+    summary="Moved to new API: http://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: http://api.deadlock-api.com/docs
+- New API Endpoint: http://api.deadlock-api.com/v1/info
+    """,
+    deprecated=True,
+)
+def get_api_info() -> RedirectResponse:
+    return RedirectResponse("https://api.deadlock-api.com/v1/info", HTTP_301_MOVED_PERMANENTLY)
 
 
 class MatchScoreDistribution(BaseModel):
