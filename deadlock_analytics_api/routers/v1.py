@@ -1229,7 +1229,7 @@ def post_win_rate_analysis(
             return entries
     except Exception as e:
         print("Error in get_win_rate_analysis", e)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
 
 
 class HeroLanePerformance(BaseModel):
