@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Annotated, Literal
@@ -24,6 +25,10 @@ from deadlock_analytics_api.rate_limiter.models import RateLimit
 
 router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
+
+LOGGER = logging.getLogger("app-v1")
+
+LOGGER.setLevel(logging.INFO)
 
 
 @router.get(
@@ -1177,6 +1182,7 @@ def post_win_rate_analysis(
             ]
 
             additional_conditions = " AND ".join(exclude_conditions + require_conditions)
+            having_conditions = f"HAVING {additional_conditions}" if additional_conditions else ""
 
             query = f"""
             WITH valid_matches AS (
@@ -1191,8 +1197,7 @@ def post_win_rate_analysis(
                     mpi.hero_id = %(hero_id)s AND
                     mpi.average_match_badge > %(min_badge_level)s
                 GROUP BY match_id, hero_id
-                HAVING
-                    {additional_conditions}
+                {having_conditions}
             )
             SELECT
                 hero_id,
@@ -1228,8 +1233,8 @@ def post_win_rate_analysis(
             # For now only return the items that are the same
             return entries
     except Exception as e:
-        print("Error in get_win_rate_analysis", e)
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        LOGGER.error("Error in get_win_rate_analysis %s", e)
+        raise HTTPException(status_code=500, detail="Internal server error in clickhouse")
 
 
 class HeroLanePerformance(BaseModel):
