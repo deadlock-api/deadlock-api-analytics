@@ -281,7 +281,9 @@ class MatchSearchResult(BaseModel):
 )
 def match_search_ids(
     req: Request,
-    account_id: Annotated[int, Path(description="The account id of a player to search for")] = None,
+    account_id: Annotated[
+        int | None, Path(description="The account id of a player to search for")
+    ] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
@@ -431,7 +433,7 @@ def match_search(
         ),
     ] = None,
     account_id: Annotated[
-        int, Query(description="The account id of a player to search for")
+        int | None, Query(description="The account id of a player to search for")
     ] = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
@@ -695,7 +697,9 @@ def get_all_finished_matches(
                 continue
             yield (
                 ",".join(
-                    (str(c) if not isinstance(c, datetime) else c.astimezone(timezone.utc))
+                    str(c)
+                    if not isinstance(c, datetime)
+                    else c.astimezone(timezone.utc).isoformat()
                     for c in row
                 )
                 + "\n"
@@ -1000,9 +1004,8 @@ def get_item_comb_win_rate_by_similarity(
     min_used_items: int | None = None,
     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
     max_unused_items: Annotated[int | None, Query(ge=0)] = None,
-    distance_function: Literal[
-        "L1", "cosine", "non_matching_build_items", "non_matching_items"
-    ] = None,
+    distance_function: Literal["L1", "cosine", "non_matching_build_items", "non_matching_items"]
+    | None = None,
     k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
 ) -> ItemCombWinRateEntry:
     limiter.apply_limits(
@@ -1032,12 +1035,13 @@ def get_item_comb_win_rate_by_similarity(
         item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
 
     max_unused_items_filter = "AND TRUE"
+    distance_func_query: str | None = distance_function
     if distance_function is None or distance_function == "L1":
-        distance_function = "L1Distance(encoded_build_items, encoded_items)"
+        distance_func_query = "L1Distance(encoded_build_items, encoded_items)"
     elif distance_function == "cosine":
-        distance_function = "cosineDistance(encoded_build_items, encoded_items)"
+        distance_func_query = "cosineDistance(encoded_build_items, encoded_items)"
     elif distance_function == "non_matching_build_items":
-        distance_function = (
+        distance_func_query = (
             "arraySum(encoded_build_items) - arrayDotProduct(encoded_build_items, encoded_items)"
         )
         if max_unused_items:
@@ -1045,7 +1049,7 @@ def get_item_comb_win_rate_by_similarity(
                 f"AND arraySum(encoded_items) - arraySum(encoded_build_items) <= {max_unused_items}"
             )
     elif distance_function == "non_matching_items":
-        distance_function = (
+        distance_func_query = (
             "arraySum(encoded_items) - arrayDotProduct(encoded_build_items, encoded_items)"
         )
         if max_unused_items:
@@ -1081,7 +1085,7 @@ def get_item_comb_win_rate_by_similarity(
         all_items as (SELECT groupUniqArray(item_id) as items_arr FROM items),
         build_items as (SELECT arrayMap(x -> toBool(has(%(item_ids)s, x)), arraySort(items_arr)) as encoded_build_items FROM all_items),
         relevant_matches as (
-            SELECT account_id, won, {distance_function} as distance
+            SELECT account_id, won, {distance_func_query} as distance
             FROM match_player_encoded_items
                 CROSS JOIN build_items
             WHERE 1=1
@@ -1268,7 +1272,7 @@ def get_hero_lane_performance(
     res: Response,
     hero_id: int,
     account_id: Annotated[
-        int, Query(description="The account id of a player to search for")
+        int | None, Query(description="The account id of a player to search for")
     ] = None,
     min_match_id: Annotated[int | None, Query(ge=0)] = None,
     max_match_id: int | None = None,
@@ -1295,84 +1299,93 @@ def get_hero_lane_performance(
     account_id = utils.validate_steam_id(account_id)
     if match_mode is None:
         match_mode = "Unranked,Ranked"
-    with CH_POOL.get_client() as client:
-        if min_unix_timestamp is not None:
-            query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
-            result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
-            if len(result) >= 1:
-                min_match_id = (
-                    max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
-                )
 
-        if max_unix_timestamp is not None:
-            query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
-            result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
-            if len(result) >= 1:
-                max_match_id = (
-                    min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
-                )
+    try:
+        with CH_POOL.get_client() as client:
+            if min_unix_timestamp is not None:
+                query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
+                result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
+                if len(result) >= 1:
+                    min_match_id = (
+                        max(min_match_id, result[0][0])
+                        if min_match_id is not None
+                        else result[0][0]
+                    )
 
-        query = """
-            SELECT
-                mp1.hero_id                 as hero1,
-                mp2.hero_id                 as hero2,
-                if(mp1.assigned_lane IN (1,6), 'solo', 'duo') as lane,
-                avg(mp1.stats.net_worth[1])  as avg_net_worth_180s_1,
-                max(mp1.stats.net_worth[1])  as max_net_worth_180s_1,
-                avg(mp2.stats.net_worth[1])  as avg_net_worth_180s_2,
-                max(mp2.stats.net_worth[1])  as max_net_worth_180s_2,
-                avg(mp1.stats.net_worth[2])  as avg_net_worth_360s_1,
-                max(mp1.stats.net_worth[2])  as max_net_worth_360s_1,
-                avg(mp2.stats.net_worth[2])  as avg_net_worth_360s_2,
-                max(mp2.stats.net_worth[2])  as max_net_worth_360s_2,
-                avg(mp1.stats.net_worth[3])  as avg_net_worth_540s_1,
-                max(mp1.stats.net_worth[3])  as max_net_worth_540s_1,
-                avg(mp2.stats.net_worth[3])  as avg_net_worth_540s_2,
-                max(mp2.stats.net_worth[3])  as max_net_worth_540s_2,
-                avg(mp1.stats.net_worth[4])  as avg_net_worth_720s_1,
-                max(mp1.stats.net_worth[4])  as max_net_worth_720s_1,
-                avg(mp2.stats.net_worth[4])  as avg_net_worth_720s_2,
-                max(mp2.stats.net_worth[4])  as max_net_worth_720s_2,
-                sum(mp1.won)                 as wins_1,
-                sum(mp2.won)                 as wins_2,
-                count()                      as matches_played
-            FROM match_player mp1 FINAL
-                INNER JOIN match_info mi FINAL USING (match_id)
-                INNER JOIN match_player mp2 FINAL USING (match_id)
-            PREWHERE hero1 = %(hero_id)s
-            WHERE true
-                AND mp1.team != mp2.team
-                AND mp1.assigned_lane = mp2.assigned_lane
-                AND length(mp1.stats.net_worth) >= 4
-                AND length(mp2.stats.net_worth) >= 4
-                AND mi.match_outcome = 'TeamWin'
-                AND (%(account_id)s IS NULL OR mp1.account_id = %(account_id)s)
-                AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
-                AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
-                AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
-                AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
-                AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-                AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
-                AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
-            GROUP BY hero1, hero2, lane
-            ORDER BY hero2, lane DESC;
-        """
-        result, keys = client.execute(
-            query,
-            {
-                "hero_id": hero_id,
-                "account_id": account_id,
-                "min_badge_level": min_badge_level,
-                "max_badge_level": max_badge_level,
-                "min_match_id": min_match_id,
-                "max_match_id": max_match_id,
-                "min_duration_s": min_duration_s,
-                "max_duration_s": max_duration_s,
-                "match_mode": match_mode.split(",") if match_mode is not None else None,
-            },
-            with_column_types=True,
-        )
-    return [HeroLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+            if max_unix_timestamp is not None:
+                query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
+                result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
+                if len(result) >= 1:
+                    max_match_id = (
+                        min(max_match_id, result[0][0])
+                        if max_match_id is not None
+                        else result[0][0]
+                    )
+
+            query = """
+                SELECT
+                    mp1.hero_id                 as hero1,
+                    mp2.hero_id                 as hero2,
+                    if(mp1.assigned_lane IN (1,6), 'solo', 'duo') as lane,
+                    avg(mp1.stats.net_worth[1])  as avg_net_worth_180s_1,
+                    max(mp1.stats.net_worth[1])  as max_net_worth_180s_1,
+                    avg(mp2.stats.net_worth[1])  as avg_net_worth_180s_2,
+                    max(mp2.stats.net_worth[1])  as max_net_worth_180s_2,
+                    avg(mp1.stats.net_worth[2])  as avg_net_worth_360s_1,
+                    max(mp1.stats.net_worth[2])  as max_net_worth_360s_1,
+                    avg(mp2.stats.net_worth[2])  as avg_net_worth_360s_2,
+                    max(mp2.stats.net_worth[2])  as max_net_worth_360s_2,
+                    avg(mp1.stats.net_worth[3])  as avg_net_worth_540s_1,
+                    max(mp1.stats.net_worth[3])  as max_net_worth_540s_1,
+                    avg(mp2.stats.net_worth[3])  as avg_net_worth_540s_2,
+                    max(mp2.stats.net_worth[3])  as max_net_worth_540s_2,
+                    avg(mp1.stats.net_worth[4])  as avg_net_worth_720s_1,
+                    max(mp1.stats.net_worth[4])  as max_net_worth_720s_1,
+                    avg(mp2.stats.net_worth[4])  as avg_net_worth_720s_2,
+                    max(mp2.stats.net_worth[4])  as max_net_worth_720s_2,
+                    sum(mp1.won)                 as wins_1,
+                    sum(mp2.won)                 as wins_2,
+                    count()                      as matches_played
+                FROM match_player mp1 FINAL
+                    INNER JOIN match_info mi FINAL USING (match_id)
+                    INNER JOIN match_player mp2 FINAL USING (match_id)
+                PREWHERE hero1 = %(hero_id)s
+                WHERE true
+                    AND mp1.team != mp2.team
+                    AND mp1.assigned_lane = mp2.assigned_lane
+                    AND length(mp1.stats.net_worth) >= 4
+                    AND length(mp2.stats.net_worth) >= 4
+                    AND mi.match_outcome = 'TeamWin'
+                    AND (%(account_id)s IS NULL OR mp1.account_id = %(account_id)s)
+                    AND (%(min_match_id)s IS NULL OR mi.match_id >= %(min_match_id)s)
+                    AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
+                    AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
+                    AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
+                    AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+                    AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                    AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
+                GROUP BY hero1, hero2, lane
+                ORDER BY hero2, lane DESC;
+            """
+            result, keys = client.execute(
+                query,
+                {
+                    "hero_id": hero_id,
+                    "account_id": account_id,
+                    "min_badge_level": min_badge_level,
+                    "max_badge_level": max_badge_level,
+                    "min_match_id": min_match_id,
+                    "max_match_id": max_match_id,
+                    "min_duration_s": min_duration_s,
+                    "max_duration_s": max_duration_s,
+                    "match_mode": match_mode.split(",") if match_mode is not None else None,
+                },
+                with_column_types=True,
+            )
+        return [HeroLanePerformance(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+    except Exception as e:
+        LOGGER.error("Error in duo lane %s", e)
+        raise HTTPException(status_code=500, detail="Something went wrong, this has been logged.")
 
 
 class HeroDuoLanePerformance(BaseModel):
@@ -1466,10 +1479,10 @@ def get_hero_duo_lane_performance(
 
         query = """
             SELECT
-                mp1.hero_id                 as hero1,
-                mp2.hero_id                 as hero2,
-                mp3.hero_id                 as hero3,
-                mp4.hero_id                 as hero4,
+                mp1.hero_id as hero1,
+                mp2.hero_id as hero2,
+                mp3.hero_id as hero3,
+                mp4.hero_id as hero4,
                 avg(mp1.stats.net_worth[1])  as avg_net_worth_180s_1,
                 max(mp1.stats.net_worth[1])  as max_net_worth_180s_1,
                 avg(mp2.stats.net_worth[1])  as avg_net_worth_180s_2,
@@ -1511,8 +1524,8 @@ def get_hero_duo_lane_performance(
                 INNER JOIN match_player mp3 FINAL USING (match_id)
                 INNER JOIN match_player mp4 FINAL USING (match_id)
             WHERE true
-                AND hero1 = %(hero1_id)s
-                AND hero2 = %(hero2_id)s
+                AND mp1.hero_id = %(hero1_id)s
+                AND mp2.hero_id = %(hero2_id)s
                 AND mp1.team = mp2.team
                 AND mp1.account_id != mp2.account_id
                 AND mp3.team = mp4.team
