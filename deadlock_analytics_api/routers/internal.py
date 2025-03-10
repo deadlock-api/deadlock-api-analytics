@@ -28,6 +28,7 @@ no_key_router = APIRouter(prefix="/v1", tags=["Internal"])
 
     You can use this endpoint to help us collect data by submitting match salts via the POST `/match-salts` endpoint.
     """,
+    deprecated=True,
 )
 def get_missing_matches(
     req: Request, res: Response, limit: Annotated[int, Query(ge=1, le=100)] = 100
