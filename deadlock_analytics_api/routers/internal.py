@@ -130,7 +130,7 @@ def post_match_salts(
     return JSONResponse(content={"success": True})
 
 
-@router.get("/recent-matches")
+@router.get("/recent-matches", deprecated=True)
 def get_recent_matches(
     api_key: APIKey = Depends(utils.get_internal_api_key),
 ) -> JSONResponse:
