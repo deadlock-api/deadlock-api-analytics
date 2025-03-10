@@ -1,18 +1,16 @@
 import logging
 from typing import Annotated
 
-import requests
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, RedirectResponse
+from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
-from deadlock_analytics_api.utils import is_internal_api_key
 
 LOGGER = logging.getLogger(__name__)
 
@@ -53,81 +51,29 @@ def get_missing_matches(
     return JSONResponse(content=[{"match_id": r[0]} for r in result])
 
 
-class MatchSalts(BaseModel):
-    match_id: int
-    cluster_id: int | None = Field(None)
-    metadata_salt: int | None = Field(None)
-    replay_salt: int | None = Field(None)
-    failed: bool | None = Field(None)
-    username: str | None = Field(None)
+# class MatchSalts(BaseModel):
+#     match_id: int
+#     cluster_id: int | None = Field(None)
+#     metadata_salt: int | None = Field(None)
+#     replay_salt: int | None = Field(None)
+#     failed: bool | None = Field(None)
+#     username: str | None = Field(None)
 
 
 @no_key_router.post(
     "/match-salts",
-    summary="Ingest match salts into the database",
+    summary="Moved to new API: https://api.deadlock-api.com/",
     description="""
-    You can use this endpoint to help us collecting data.
-
-    The endpoint accepts a list of MatchSalts objects, which contain the following fields:
-
-    - `match_id`: The match ID
-    - `cluster_id`: The cluster ID
-    - `metadata_salt`: The metadata salt
-    - `replay_salt`: The replay salt
-    - `username`: The username of the person who submitted the match
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/matches/active
     """,
+    deprecated=True,
 )
-def post_match_salts(
-    req: Request,
-    match_salts: list[MatchSalts] | MatchSalts,
-    api_key: str | None = None,
-) -> JSONResponse:
-    api_key = api_key or req.headers.get("X-API-Key")
-    bypass_check = is_internal_api_key(api_key)
-
-    LOGGER.debug(f"Authenticated with API key: {api_key}")
-    LOGGER.info(f"Received match_salts: {match_salts}")
-    match_salts = [match_salts] if isinstance(match_salts, MatchSalts) else match_salts
-    errors = []
-    for match_salt in match_salts:
-        if not bypass_check:
-            url = f"http://replay{match_salt.cluster_id}.valve.net/1422450/{match_salt.match_id}_{match_salt.metadata_salt}.meta.bz2"
-            try:
-                response = requests.head(url)
-
-                if response.status_code != 200:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Metadata not found for match {match_salt.match_id}",
-                    )
-            except requests.RequestException as e:
-                errors.append(e)
-                continue
-            except HTTPException as e:
-                errors.append(e)
-                continue
-        try:
-            query = "SELECT * FROM match_salts WHERE match_id = %(match_id)s"
-            with CH_POOL.get_client() as client:
-                result = client.execute(query, {"match_id": match_salt.match_id})
-            if len(result) > 0:
-                LOGGER.warning(f"Match {match_salt.match_id} already in match_salts")
-                continue
-            if match_salt.failed:
-                query = "INSERT INTO match_salts (match_id, failed) VALUES (%(match_id)s, TRUE)"
-            else:
-                query = "INSERT INTO match_salts (match_id, cluster_id, metadata_salt, replay_salt, username) VALUES (%(match_id)s, %(cluster_id)s, %(metadata_salt)s, %(replay_salt)s, %(username)s)"
-            with CH_POOL.get_client() as client:
-                client.execute(query, match_salt.model_dump())
-        except Exception as e:
-            LOGGER.error(f"Failed to insert match_salt: {e}")
-    if errors:
-        raise (
-            errors[0]
-            if isinstance(errors[0], HTTPException)
-            else HTTPException(status_code=500, detail="Failed to fetch metadata")
-        )
-    return JSONResponse(content={"success": True})
+def post_match_salts() -> RedirectResponse:
+    return RedirectResponse(
+        "https://api.deadlock-api.com/v1/matches/salts", HTTP_301_MOVED_PERMANENTLY
+    )
 
 
 @router.get("/recent-matches", deprecated=True)
