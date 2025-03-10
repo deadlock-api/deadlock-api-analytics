@@ -26,10 +26,10 @@ router = APIRouter(prefix="/v1", tags=["V1"])
 def get_ch_client() -> clickhouse_driver.Client:
     return clickhouse_driver.Client(
         host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-        port=int(os.getenv("CLICKHOUSE_PORT", 9000)),
+        port=int(os.getenv("CLICKHOUSE_NATIVE_PORT", 9000)),
         user=os.getenv("CLICKHOUSE_READONLY_USER", "default"),
         password=os.getenv("CLICKHOUSE_READONLY_PASSWORD", ""),
-        database=os.getenv("CLICKHOUSE_DB", "default"),
+        database=os.getenv("CLICKHOUSE_DBNAME", "default"),
     )
 
 

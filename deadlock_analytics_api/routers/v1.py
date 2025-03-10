@@ -664,10 +664,10 @@ def get_all_finished_matches(
     """
     client = Client(
         host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-        port=int(os.getenv("CLICKHOUSE_PORT", 9000)),
-        user=os.getenv("CLICKHOUSE_USER", "default"),
+        port=int(os.getenv("CLICKHOUSE_NATIVE_PORT", 9000)),
+        user=os.getenv("CLICKHOUSE_USERNAME", "default"),
         password=os.getenv("CLICKHOUSE_PASSWORD", ""),
-        database=os.getenv("CLICKHOUSE_DB", "default"),
+        database=os.getenv("CLICKHOUSE_DBNAME", "default"),
     )
 
     async def stream():
