@@ -33,11 +33,11 @@ LOGGER.setLevel(logging.INFO)
 
 @router.get(
     "/info",
-    summary="Moved to new API: http://api.deadlock-api.com/",
+    summary="Moved to new API: https://api.deadlock-api.com/",
     description="""
 # Endpoint moved to new API
-- New API Docs: http://api.deadlock-api.com/docs
-- New API Endpoint: http://api.deadlock-api.com/v1/info
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/info
     """,
     deprecated=True,
 )
@@ -87,11 +87,11 @@ class MatchBadgeLevelDistribution(BaseModel):
 
 @router.get(
     "/match-badge-level-distribution",
-    summary="Moved to new API: http://api.deadlock-api.com/",
+    summary="Moved to new API: https://api.deadlock-api.com/",
     description="""
 # Endpoint moved to new API
-- New API Docs: http://api.deadlock-api.com/docs
-- New API Endpoint: http://api.deadlock-api.com/v1/matches/badge-distribution
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/matches/badge-distribution
     """,
     deprecated=True,
 )
@@ -427,11 +427,11 @@ match_player_fields_markdown_list = "\n".join(f"- {f}" for f in MATCH_PLAYER_FIE
 
 @router.get(
     "/matches/search",
-    summary="Moved to new API: http://api.deadlock-api.com/",
+    summary="Moved to new API: https://api.deadlock-api.com/",
     description="""
 # Endpoint moved to new API
-- New API Docs: http://api.deadlock-api.com/docs
-- New API Endpoint: http://api.deadlock-api.com/v1/matches/metadata
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/matches/metadata
     """,
     deprecated=True,
 )
