@@ -133,7 +133,16 @@ def get_leaderboard_by_region(
     ]
 
 
-@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s")
+@router.get(
+    "/hero-win-loss-stats",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/analytics/hero-win-loss-stats
+    """,
+    deprecated=True,
+)
 def get_hero_win_loss_stats(
     req: Request,
     res: Response,
