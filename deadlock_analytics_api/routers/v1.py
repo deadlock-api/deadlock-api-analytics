@@ -554,6 +554,8 @@ def match_search(
 @router.get(
     "/matches/{match_id}/short",
     summary="RateLimit: 100req/s",
+    deprecated=True,
+    include_in_schema=False,
 )
 def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
     limiter.apply_limits(
@@ -580,6 +582,8 @@ def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
 @router.get(
     "/matches/{match_id}/timestamps",
     summary="RateLimit: 100req/s",
+    deprecated=True,
+    include_in_schema=False,
 )
 def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
     limiter.apply_limits(
@@ -616,10 +620,11 @@ def get_match_metadata(match_id: int) -> RedirectResponse:
     "/matches/{match_id}/raw_metadata",
     description="# Moved to Data API",
     deprecated=True,
+    include_in_schema=False,
 )
 def get_raw_metadata_file(match_id: int) -> RedirectResponse:
     return RedirectResponse(
-        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/raw-metadata",
+        url=f"https://api.deadlock-api.com/v1/matches/{match_id}/metadata",
         status_code=HTTP_301_MOVED_PERMANENTLY,
     )
 
@@ -628,6 +633,8 @@ def get_raw_metadata_file(match_id: int) -> RedirectResponse:
     "/matches/short",
     summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key with data access",
     tags=["Data API-Key required"],
+    deprecated=True,
+    include_in_schema=False,
 )
 def get_all_finished_matches(
     req: Request,
@@ -728,6 +735,7 @@ def get_all_finished_matches(
     "/matches/by-account-id/{account_id}",
     deprecated=True,
     summary="RateLimit: 100req/s",
+    include_in_schema=False,
 )
 def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> list[dict]:
     limiter.apply_limits(
