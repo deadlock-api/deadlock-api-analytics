@@ -1108,7 +1108,16 @@ def get_player_mmr_history(
     return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
 
 
-@router.get("/players/{account_id}/match-history", summary="RateLimit: 100req/s")
+@router.get(
+    "/players/{account_id}/match-history",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/match-history
+    """,
+    deprecated=True,
+)
 def get_matches_by_account_id(
     req: Request,
     res: Response,

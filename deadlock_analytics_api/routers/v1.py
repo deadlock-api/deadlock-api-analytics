@@ -733,8 +733,13 @@ def get_all_finished_matches(
 
 @router.get(
     "/matches/by-account-id/{account_id}",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/match-history
+    """,
     deprecated=True,
-    summary="RateLimit: 100req/s",
     include_in_schema=False,
 )
 def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> list[dict]:
