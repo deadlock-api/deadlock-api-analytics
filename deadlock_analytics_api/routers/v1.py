@@ -85,7 +85,16 @@ class MatchBadgeLevelDistribution(BaseModel):
         return self.match_badge_level % 10 if self.match_badge_level is not None else None
 
 
-@router.get("/match-badge-level-distribution", summary="RateLimit: 100req/s")
+@router.get(
+    "/match-badge-level-distribution",
+    summary="Moved to new API: http://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: http://api.deadlock-api.com/docs
+- New API Endpoint: http://api.deadlock-api.com/v1/matches/badge-distribution
+    """,
+    deprecated=True,
+)
 def get_match_badge_level_distribution(
     req: Request,
     res: Response,
