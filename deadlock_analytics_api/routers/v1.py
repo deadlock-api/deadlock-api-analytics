@@ -1179,8 +1179,8 @@ def post_win_rate_analysis(
     req: Request,
     res: Response,
     hero_id: int,
-    excluded_item_ids: list[int] = [],
-    required_item_ids: list[int] = [],
+    excluded_item_ids: list[int] | None = None,
+    required_item_ids: list[int] | None = None,
     min_badge_level: int = 80,
 ) -> list[ItemWinRateEntry]:
     limiter.apply_limits(
@@ -1190,6 +1190,9 @@ def post_win_rate_analysis(
         [RateLimit(limit=10, period=60)],
         [RateLimit(limit=10, period=60)],
     )
+
+    excluded_item_ids = excluded_item_ids or []
+    required_item_ids = required_item_ids or []
 
     START_TIME = "2025-02-25"
     try:
