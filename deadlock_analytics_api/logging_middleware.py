@@ -41,7 +41,7 @@ class RouterLoggingMiddleware(BaseHTTPMiddleware):
         try:
             api_key = req.headers.get("X-API-Key", req.query_params.get("api_key"))
             request_logging["X-API-Key"] = api_key
-        except Exception:
+        except AttributeError:
             pass
 
         return request_logging
