@@ -205,7 +205,11 @@ class RegionDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-region-distribution", summary="RateLimit: 100req/s")
+@router.get(
+    "/match-region-distribution",
+    summary="RateLimit: 100req/s",
+    deprecated=True,
+)
 def get_match_region_distribution(req: Request, res: Response) -> list[RegionDistribution]:
     limiter.apply_limits(
         req, res, "/v1/match-region-distribution", [RateLimit(limit=100, period=1)]
@@ -423,7 +427,13 @@ match_player_fields_markdown_list = "\n".join(f"- {f}" for f in MATCH_PLAYER_FIE
 
 @router.get(
     "/matches/search",
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: http://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: http://api.deadlock-api.com/docs
+- New API Endpoint: http://api.deadlock-api.com/v1/matches/metadata
+    """,
+    deprecated=True,
 )
 def match_search(
     req: Request,
