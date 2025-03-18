@@ -16,7 +16,6 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "redis[hiredis]>=5.2.0",
     "requests>=2.32.3",
-    "sentry-sdk[fastapi]>=2.19.0",
     "uuid>=1.30",
 ]
 
