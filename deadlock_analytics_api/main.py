@@ -9,7 +9,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
 from deadlock_analytics_api.logging_middleware import RouterLoggingMiddleware
-from deadlock_analytics_api.routers import internal, v1, v2
+from deadlock_analytics_api.routers import v1, v2
 
 # Doesn't use AppConfig because logging is critical
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "DEBUG"))
@@ -79,8 +79,6 @@ async def _startup():
 app.include_router(v2.router)
 app.include_router(v1.router)
 app.include_router(v1.no_tagged_router)
-app.include_router(internal.router)
-app.include_router(internal.no_key_router)
 
 
 @app.get("/", include_in_schema=False)

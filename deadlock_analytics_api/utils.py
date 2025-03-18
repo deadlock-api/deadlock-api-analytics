@@ -78,18 +78,6 @@ async def get_data_api_key(api_key: str = Security(api_key_param)):
     return api_key
 
 
-async def get_internal_api_key(api_key: str = Security(api_key_param)):
-    if not is_internal_api_key(api_key):
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN)
-
-
-def is_internal_api_key(api_key: str) -> bool:
-    with open("internal_api_keys.txt") as f:
-        available_api_keys = f.read().splitlines()
-        available_api_keys = [a.split("#")[0].strip() for a in available_api_keys]
-    return api_key in available_api_keys
-
-
 def is_valid_uuid(value: str) -> bool:
     if value is None:
         return False
