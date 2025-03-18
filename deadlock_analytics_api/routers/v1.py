@@ -95,24 +95,13 @@ def get_match_badge_level_distribution(
     limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=3600"
     query = """
-    WITH ranked_badge AS (
-        SELECT ranked_badge_level
-        FROM finished_matches
-        WHERE (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-
-        UNION ALL
-
-        SELECT ranked_badge_level
-        FROM match_info FINAL
-        ARRAY JOIN [average_badge_team0, average_badge_team1] AS ranked_badge_level
-        WHERE match_id NOT IN (SELECT match_id FROM finished_matches)
+    SELECT ranked_badge_level, COUNT() as match_score_count
+    FROM match_info FINAL
+    ARRAY JOIN [average_badge_team0, average_badge_team1] AS ranked_badge_level
+    WHERE ranked_badge_level > 0
+        AND match_id NOT IN (SELECT match_id FROM finished_matches)
         AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-    )
-    SELECT ranked_badge_level, COUNT() as match_score_count
-    FROM ranked_badge
-    WHERE ranked_badge_level > 0
     GROUP BY ranked_badge_level
     ORDER BY ranked_badge_level;
     """
