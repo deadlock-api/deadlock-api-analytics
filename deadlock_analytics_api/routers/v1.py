@@ -50,7 +50,11 @@ class MatchScoreDistribution(BaseModel):
     count: int
 
 
-@router.get("/match-score-distribution", summary="RateLimit: 100req/s")
+@router.get(
+    "/match-score-distribution",
+    summary="RateLimit: 100req/s",
+    deprecated=True,
+)
 def get_match_score_distribution(req: Request, res: Response) -> list[MatchScoreDistribution]:
     limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
     res.headers["Cache-Control"] = "public, max-age=3600"
@@ -135,7 +139,11 @@ class PlayerBadgeLevelDistribution(BaseModel):
         return self.player_badge_level % 10 if self.player_badge_level is not None else None
 
 
-@router.get("/player-badge-level-distribution", summary="RateLimit: 100req/s")
+@router.get(
+    "/player-badge-level-distribution",
+    summary="RateLimit: 100req/s",
+    deprecated=True,
+)
 def get_player_badge_level_distribution(
     req: Request,
     res: Response,
