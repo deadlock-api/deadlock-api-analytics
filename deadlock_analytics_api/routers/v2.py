@@ -1185,9 +1185,7 @@ def get_matches_by_account_id(
     if len(entries) == 0:
         raise HTTPException(status_code=404, detail="Not found")
 
-    def transform(k, v):
-        # if k == "start_time" and isinstance(v, int):
-        #     v = datetime.fromtimestamp(v, timezone.utc)
+    def transform(v):
         return v if not isinstance(v, datetime) else v.astimezone(timezone.utc)
 
-    return [{k: transform(k, v) for (k, _), v in zip(keys, r)} for r in entries]
+    return [{k: transform(v) for (k, _), v in zip(keys, r)} for r in entries]
