@@ -776,7 +776,13 @@ def get_player_hero_stats(
 
 @router.get(
     "/players/item-stats",
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/item-stats
+    """,
+    deprecated=True,
 )
 def get_player_item_stats_batch(
     req: Request,
@@ -847,8 +853,14 @@ def get_player_item_stats_batch(
 
 
 @router.get(
-    "/players/{account_id}/item-stats",
-    summary="RateLimit: 100req/s",
+    "/players/item-stats",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/item-stats
+    """,
+    deprecated=True,
 )
 def get_player_item_stats(
     req: Request,
