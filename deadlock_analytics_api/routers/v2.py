@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException, Path, Query
+from starlette.datastructures import URL
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_301_MOVED_PERMANENTLY
@@ -19,7 +20,6 @@ from deadlock_analytics_api.routers.v2_models import (
     PlayerHeroStat,
     PlayerItemStat,
     PlayerLeaderboardV2,
-    PlayerMate,
     PlayerMMRHistoryEntryV2,
     PlayerParty,
     HeroCombsWinLossStat,
@@ -875,7 +875,12 @@ def get_player_item_stats(
 
 @router.get(
     "/players/{account_id}/mates",
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/mate-stats
+    """,
     include_in_schema=False,
     deprecated=True,
 )
@@ -883,58 +888,31 @@ def get_player_mates(
     account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
 ):
     return RedirectResponse(
-        url=f"/v2/players/{account_id}/mate-stats",
+        url=f"https://api.deadlock-api.com/v1/players/{account_id}/mate-stats",
         status_code=HTTP_301_MOVED_PERMANENTLY,
     )
 
 
 @router.get(
     "/players/{account_id}/mate-stats",
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/mate-stats
+    """,
+    deprecated=True,
 )
 def get_player_mate_stats(
     req: Request,
-    res: Response,
     account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-) -> list[PlayerMate]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/players/{account_id}/mate-stats",
-        [RateLimit(limit=100, period=1)],
-    )
-    account_id = utils.validate_steam_id(account_id)
-    query = """
-    SELECT mate_id, countIf(p.won) as wins, COUNT() as matches_played, groupArray(p.match_id) as matches
-    FROM match_parties p
-    ARRAY JOIN p.account_ids as mate_id
-    INNER JOIN match_info mi USING (match_id)
-    WHERE has(p.account_ids, %(account_id)s)
-    AND mi.match_outcome = 'TeamWin'
-    AND mi.match_mode IN ('Ranked', 'Unranked')
-    AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
-    AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
-    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-    GROUP BY mate_id
-    ORDER BY matches_played DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result, keys = client.execute(
-            query,
-            {
-                "account_id": account_id,
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-                "match_mode": match_mode,
-            },
-            with_column_types=True,
-        )
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    return [PlayerMate(**{k: v for (k, _), v in zip(keys, r)}) for r in result]
+) -> RedirectResponse:
+    url = URL(f"https://api.deadlock-api.com/v1/players/{account_id}/mate-stats")
+    url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
+    return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
 @router.get(

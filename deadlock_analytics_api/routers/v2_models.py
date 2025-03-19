@@ -168,11 +168,11 @@ class PlayerItemStat(BaseModel):
     matches: int
 
 
-class PlayerMate(BaseModel):
-    mate_id: int = Field(description="The account id of the mate, it's a SteamID3")
-    wins: int
-    matches_played: int
-    matches: list[int]
+# class PlayerMate(BaseModel):
+#     mate_id: int = Field(description="The account id of the mate, it's a SteamID3")
+#     wins: int
+#     matches_played: int
+#     matches: list[int]
 
 
 class PlayerParty(BaseModel):
