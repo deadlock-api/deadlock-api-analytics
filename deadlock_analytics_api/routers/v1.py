@@ -250,10 +250,10 @@ def get_hero_leaderboard(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT hero_id, account_id, wins, matches as total
+    SELECT hero_id, account_id, wins, matches_played as total
     FROM player_hero_stats
     WHERE matches >= %(min_total_games)s AND hero_id = %(hero_id)s
-    ORDER BY wins / matches DESC
+    ORDER BY wins / matches_played DESC
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
