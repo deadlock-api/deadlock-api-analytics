@@ -3,7 +3,6 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from cachetools.func import ttl_cache
 from fastapi import APIRouter, HTTPException, Path, Query
 from starlette.datastructures import URL
 from starlette.requests import Request
@@ -15,7 +14,6 @@ from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.routers.v2_models import (
-    HeroItemWinLossStat,
     PlayerCardHistoryEntry,
     PlayerHeroStat,
     PlayerItemStat,
@@ -475,78 +473,65 @@ def get_hero_item_win_loss_stats(
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
     region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
-) -> list[HeroItemWinLossStat]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/hero/{hero_id}/item-win-loss-stats",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    return get_hero_item_win_loss_stats_cached(
-        hero_id,
-        item_id,
-        min_badge_level,
-        max_badge_level,
-        min_unix_timestamp,
-        max_unix_timestamp,
-        match_mode,
-        region,
-    )
+) -> RedirectResponse:
+    url = URL("https://api.deadlock-api.com/v1/analytics/item-win-loss-stats")
+    url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
+    url = url.include_query_params(hero_id=hero_id)
+    return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
-@ttl_cache(ttl=3600)
-def get_hero_item_win_loss_stats_cached(
-    hero_id: int,
-    item_id: int | None = None,
-    min_badge_level: Annotated[int | None, Query(ge=0)] = None,
-    max_badge_level: Annotated[int | None, Query(le=116)] = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
-) -> list[HeroItemWinLossStat]:
-    query = """
-    SELECT
-        hero_id,
-        item_id,
-        countIf(won) AS wins,
-        countIf(NOT won) AS losses
-    FROM match_player_item_v2
-    INNER JOIN match_info mi USING (match_id)
-    INNER JOIN player p USING (account_id)
-    WHERE TRUE
-    AND mi.match_outcome = 'TeamWin'
-    AND mi.match_mode IN ('Ranked', 'Unranked')
-    AND %(hero_id)s = hero_id
-    AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
-    AND (%(min_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-    AND (%(max_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
-    AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
-    AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
-    AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-    AND (%(region)s IS NULL OR p.region_mode = %(region)s)
-    GROUP BY hero_id, item_id
-    ORDER BY wins + losses DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {
-                "hero_id": hero_id,
-                "item_id": item_id,
-                "min_badge_level": min_badge_level,
-                "max_badge_level": max_badge_level,
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-                "match_mode": match_mode,
-                "region": region,
-            },
-        )
-    return [
-        HeroItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3], matches=r[2] + r[3])
-        for r in result
-    ]
+# @ttl_cache(ttl=3600)
+# def get_hero_item_win_loss_stats_cached(
+#     hero_id: int,
+#     item_id: int | None = None,
+#     min_badge_level: Annotated[int | None, Query(ge=0)] = None,
+#     max_badge_level: Annotated[int | None, Query(le=116)] = None,
+#     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
+#     max_unix_timestamp: int | None = None,
+#     match_mode: Literal["Ranked", "Unranked"] | None = None,
+#     region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
+# ) -> list[HeroItemWinLossStat]:
+#     query = """
+#     SELECT
+#         hero_id,
+#         item_id,
+#         countIf(won) AS wins,
+#         countIf(NOT won) AS losses
+#     FROM match_player_item_v2
+#     INNER JOIN match_info mi USING (match_id)
+#     INNER JOIN player p USING (account_id)
+#     WHERE TRUE
+#     AND mi.match_outcome = 'TeamWin'
+#     AND mi.match_mode IN ('Ranked', 'Unranked')
+#     AND %(hero_id)s = hero_id
+#     AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
+#     AND (%(min_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+#     AND (%(max_badge_level)s IS NULL OR (average_match_badge IS NOT NULL AND average_match_badge <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+#     AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
+#     AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
+#     AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
+#     AND (%(region)s IS NULL OR p.region_mode = %(region)s)
+#     GROUP BY hero_id, item_id
+#     ORDER BY wins + losses DESC;
+#     """
+#     with CH_POOL.get_client() as client:
+#         result = client.execute(
+#             query,
+#             {
+#                 "hero_id": hero_id,
+#                 "item_id": item_id,
+#                 "min_badge_level": min_badge_level,
+#                 "max_badge_level": max_badge_level,
+#                 "min_unix_timestamp": min_unix_timestamp,
+#                 "max_unix_timestamp": max_unix_timestamp,
+#                 "match_mode": match_mode,
+#                 "region": region,
+#             },
+#         )
+#     return [
+#         HeroItemWinLossStat(hero_id=r[0], item_id=r[1], wins=r[2], losses=r[3], matches=r[2] + r[3])
+#         for r in result
+#     ]
 
 
 # @ttl_cache(ttl=3600)
