@@ -36,11 +36,11 @@ class HeroItemWinLossStat(BaseModel):
     matches: int
 
 
-class ItemWinLossStat(BaseModel):
-    item_id: int
-    wins: int
-    losses: int
-    matches: int
+# class ItemWinLossStat(BaseModel):
+#     item_id: int
+#     wins: int
+#     losses: int
+#     matches: int
 
 
 class PlayerCardSlot(BaseModel):
@@ -182,14 +182,14 @@ class PlayerItemStat(BaseModel):
 #     matches: list[int]
 
 
-class HeroWinLossStatV2(BaseModel):
-    hero_id: int
-    wins: int
-    losses: int
-    matches: int
-    total_kills: int = Field(description="The total number of kills over all matches")
-    total_deaths: int = Field(description="The total number of deaths over all matches")
-    total_assists: int = Field(description="The total number of assists over all matches")
+# class HeroWinLossStatV2(BaseModel):
+#     hero_id: int
+#     wins: int
+#     losses: int
+#     matches: int
+#     total_kills: int = Field(description="The total number of kills over all matches")
+#     total_deaths: int = Field(description="The total number of deaths over all matches")
+#     total_assists: int = Field(description="The total number of assists over all matches")
 
 
 class HeroCombsWinLossStat(BaseModel):
