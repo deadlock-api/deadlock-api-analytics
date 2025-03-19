@@ -853,7 +853,7 @@ def get_player_item_stats_batch(
 
 
 @router.get(
-    "/players/item-stats",
+    "/players/{account_id}/item-stats",
     summary="Moved to new API: https://api.deadlock-api.com/",
     description="""
 # Endpoint moved to new API
