@@ -175,11 +175,11 @@ class PlayerItemStat(BaseModel):
 #     matches: list[int]
 
 
-class PlayerParty(BaseModel):
-    party_size: int
-    wins: int
-    matches_played: int
-    matches: list[int]
+# class PlayerParty(BaseModel):
+#     party_size: int
+#     wins: int
+#     matches_played: int
+#     matches: list[int]
 
 
 class HeroWinLossStatV2(BaseModel):
