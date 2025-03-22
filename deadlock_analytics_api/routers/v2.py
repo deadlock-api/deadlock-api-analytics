@@ -904,6 +904,7 @@ def get_player_party_stats(
 @router.get(
     "/players/card-history",
     summary="RateLimit: 100req/s",
+    deprecated=True,
 )
 def get_player_card_history_batch(
     req: Request,
@@ -944,6 +945,7 @@ def get_player_card_history_batch(
 @router.get(
     "/players/{account_id}/card-history",
     summary="RateLimit: 100req/s",
+    deprecated=True,
 )
 def get_player_card_history(
     req: Request,
