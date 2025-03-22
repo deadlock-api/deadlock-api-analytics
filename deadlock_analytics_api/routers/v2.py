@@ -223,8 +223,8 @@ def get_hero_combs_win_loss_stats(
         WHERE 1=1
         AND mi.match_outcome = 'TeamWin'
         AND mi.match_mode IN ('Ranked', 'Unranked')
-        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+        AND (%(min_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
@@ -345,8 +345,8 @@ def get_hero_matchups_win_loss_stats(
         WHERE 1=1
         AND mi.match_outcome = 'TeamWin'
         AND mi.match_mode IN ('Ranked', 'Unranked')
-        AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-        AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+        AND (%(min_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+        AND (%(max_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
@@ -623,7 +623,6 @@ def get_player_hero_stats_batch(
             account_id,
             hero_id,
             count(*)                                                                                   AS matches,
-            max(ranked_badge_level)                                                                    AS highest_ranked_badge_level,
             countIf(won)                                                                               AS wins,
             avg(arrayMax(stats.level))                                                                 AS ending_level,
             sum(kills)                                                                                 AS kills,
@@ -981,7 +980,7 @@ def get_player_mmr_history_batch(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-    SELECT match_id, ranked_badge_level, won, 'metadata' as source
+    SELECT match_id, won, 'metadata' as source
     FROM match_player
     WHERE account_id IN %(account_ids)s
     ORDER BY match_id DESC;
@@ -995,9 +994,8 @@ def get_player_mmr_history_batch(
             PlayerMMRHistoryEntryV2(
                 account_id=account_id,
                 match_id=r[0],
-                match_ranked_badge_level=r[1],
-                won=r[2],
-                source=r[3],
+                won=r[1],
+                source=r[2],
             )
             for r in result
         ]

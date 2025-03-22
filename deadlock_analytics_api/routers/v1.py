@@ -8,6 +8,7 @@ from clickhouse_driver import Client
 from fastapi import APIRouter, Depends, Path, Query
 from fastapi.openapi.models import APIKey
 from pydantic import BaseModel, Field, computed_field, field_validator
+from starlette.datastructures import URL
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response, StreamingResponse
@@ -70,19 +71,19 @@ def get_match_score_distribution(req: Request, res: Response) -> list[MatchScore
     return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
 
 
-class MatchBadgeLevelDistribution(BaseModel):
-    match_badge_level: int
-    count: int
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return self.match_badge_level // 10 if self.match_badge_level is not None else None
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return self.match_badge_level % 10 if self.match_badge_level is not None else None
+# class MatchBadgeLevelDistribution(BaseModel):
+#     match_badge_level: int
+#     count: int
+#
+#     @computed_field
+#     @property
+#     def match_ranked_rank(self) -> int | None:
+#         return self.match_badge_level // 10 if self.match_badge_level is not None else None
+#
+#     @computed_field
+#     @property
+#     def match_ranked_subrank(self) -> int | None:
+#         return self.match_badge_level % 10 if self.match_badge_level is not None else None
 
 
 @router.get(
@@ -95,109 +96,10 @@ class MatchBadgeLevelDistribution(BaseModel):
     """,
     deprecated=True,
 )
-def get_match_badge_level_distribution(
-    req: Request,
-    res: Response,
-    min_unix_timestamp: int | None = None,
-    max_unix_timestamp: int | None = None,
-) -> list[MatchBadgeLevelDistribution]:
-    limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = """
-    SELECT ranked_badge_level, COUNT() as match_score_count
-    FROM match_info FINAL
-    ARRAY JOIN [average_badge_team0, average_badge_team1] AS ranked_badge_level
-    WHERE ranked_badge_level > 0
-        AND match_id NOT IN (SELECT match_id FROM finished_matches)
-        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-    GROUP BY ranked_badge_level
-    ORDER BY ranked_badge_level;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {"min_unix_timestamp": min_unix_timestamp, "max_unix_timestamp": max_unix_timestamp},
-        )
-    return [MatchBadgeLevelDistribution(match_badge_level=row[0], count=row[1]) for row in result]
-
-
-class PlayerBadgeLevelDistribution(BaseModel):
-    player_badge_level: int
-    count: int
-
-    @computed_field
-    @property
-    def player_ranked_rank(self) -> int | None:
-        return self.player_badge_level // 10 if self.player_badge_level is not None else None
-
-    @computed_field
-    @property
-    def player_ranked_subrank(self) -> int | None:
-        return self.player_badge_level % 10 if self.player_badge_level is not None else None
-
-
-@router.get(
-    "/player-badge-level-distribution",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_player_badge_level_distribution(
-    req: Request,
-    res: Response,
-    min_unix_timestamp: int | None = None,
-    max_unix_timestamp: int | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
-) -> list[PlayerBadgeLevelDistribution]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/player-badge-level-distribution",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = """
-    WITH ranked_badge AS (
-        SELECT ranked_badge_level
-        FROM player_card
-        INNER JOIN player USING account_id
-        WHERE created_at <= toDateTime('2024-11-22 01:08:32')
-        AND (%(region)s IS NULL OR region_mode = %(region)s)
-        AND (%(min_unix_timestamp)s IS NULL OR created_at >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR created_at <= toDateTime(%(max_unix_timestamp)s))
-        ORDER BY created_at DESC
-        LIMIT 1 BY account_id
-
-        UNION ALL
-
-        SELECT multiIf(team = 'Team0', mi.average_badge_team0, team = 'Team1', mi.average_badge_team1, 0) AS ranked_badge_level
-        FROM match_player FINAL
-        INNER JOIN match_info mi FINAL USING (match_id)
-        INNER JOIN player USING account_id
-        WHERE account_id > 0
-        AND created_at > toDateTime('2024-11-22 01:08:32')
-        AND (%(region)s IS NULL OR region_mode = %(region)s)
-        AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
-        ORDER BY start_time DESC
-        LIMIT 1 by account_id
-    )
-    SELECT ranked_badge_level, COUNT(*) AS count
-    FROM ranked_badge
-    WHERE ranked_badge_level > 0
-    GROUP BY ranked_badge_level
-    ORDER BY ranked_badge_level;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-                "region": region,
-            },
-        )
-    return [PlayerBadgeLevelDistribution(player_badge_level=row[0], count=row[1]) for row in result]
+def get_match_badge_level_distribution(req: Request) -> RedirectResponse:
+    url = URL("https://api.deadlock-api.com/v1/matches/badge-distribution")
+    url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
+    return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
 class RegionDistribution(BaseModel):
@@ -418,8 +320,6 @@ MATCH_PLAYER_FIELDS = [
     "stats.heal_lost",
     "stats.damage_mitigated",
     "stats.level",
-    "ranked_badge_level",
-    "ranked_badge_detail",
     "won",
 ]
 match_player_fields_markdown_list = "\n".join(f"- {f}" for f in MATCH_PLAYER_FIELDS)
@@ -1393,8 +1293,8 @@ def get_hero_lane_performance(
                     AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
                     AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
                     AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
-                    AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-                    AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                    AND (%(min_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+                    AND (%(max_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
                     AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
                 GROUP BY hero1, hero2, lane
                 ORDER BY hero2, lane DESC;
@@ -1575,8 +1475,8 @@ def get_hero_duo_lane_performance(
                 AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
                 AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
                 AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
-                AND (%(min_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-                AND (%(max_badge_level)s IS NULL OR (ranked_badge_level IS NOT NULL AND ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+                AND (%(min_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+                AND (%(max_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
                 AND (%(match_mode)s IS NULL OR mi.match_mode IN %(match_mode)s)
             GROUP BY hero1, hero2, hero3, hero4
             ORDER BY hero2, hero3, hero4;
@@ -1735,8 +1635,8 @@ WITH net_worth_diff AS (
     AND (%(max_match_id)s IS NULL OR mi.match_id <= %(max_match_id)s)
     AND (%(min_duration_s)s IS NULL OR mi.duration_s >= %(min_duration_s)s)
     AND (%(max_duration_s)s IS NULL OR mi.duration_s <= %(max_duration_s)s)
-    AND (%(min_badge_level)s IS NULL OR (mp.ranked_badge_level IS NOT NULL AND mp.ranked_badge_level >= %(min_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
-    AND (%(max_badge_level)s IS NULL OR (mp.ranked_badge_level IS NOT NULL AND mp.ranked_badge_level <= %(max_badge_level)s) OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
+    AND (%(min_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 >= %(min_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 >= %(min_badge_level)s))
+    AND (%(max_badge_level)s IS NULL OR (mi.average_badge_team0 IS NOT NULL AND mi.average_badge_team0 <= %(max_badge_level)s) OR (mi.average_badge_team1 IS NOT NULL AND mi.average_badge_team1 <= %(max_badge_level)s))
     GROUP BY mi.match_id
 )
 SELECT

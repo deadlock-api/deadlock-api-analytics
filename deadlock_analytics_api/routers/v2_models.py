@@ -96,25 +96,6 @@ class PlayerMMRHistoryEntryV2(BaseModel):
     match_id: int
     won: bool = Field(False)
     source: str
-    match_ranked_badge_level: int | None = Field(None)
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
 
 
 class PlayerHeroStat(BaseModel):
@@ -139,25 +120,6 @@ class PlayerHeroStat(BaseModel):
     obj_damage_per_min: float
     accuracy: float
     crit_shot_rate: float
-    highest_ranked_badge_level: int | None = None
-
-    @computed_field
-    @property
-    def highest_ranked_rank(self) -> int | None:
-        return (
-            self.highest_ranked_badge_level // 10
-            if self.highest_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def highest_ranked_subrank(self) -> int | None:
-        return (
-            self.highest_ranked_badge_level % 10
-            if self.highest_ranked_badge_level is not None
-            else None
-        )
 
 
 class PlayerItemStat(BaseModel):
