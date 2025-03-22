@@ -958,6 +958,7 @@ def get_player_card_history(
 @router.get(
     "/players/mmr-history",
     summary="RateLimit: 100req/s",
+    deprecated=True,
 )
 def get_player_mmr_history_batch(
     req: Request,
@@ -1007,6 +1008,7 @@ def get_player_mmr_history_batch(
 @router.get(
     "/players/{account_id}/mmr-history",
     summary="RateLimit: 100req/s",
+    deprecated=True,
 )
 def get_player_mmr_history(
     req: Request,
