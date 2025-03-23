@@ -732,7 +732,6 @@ def get_player_item_stats_batch(
     item_id: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> dict[int, list[PlayerItemStat]]:
     account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
     if len(account_ids) > 100:
@@ -746,24 +745,32 @@ def get_player_item_stats_batch(
     )
     res.headers["Cache-Control"] = "public, max-age=300"
     query = """
-        SELECT
-            account_id,
-            hero_id,
-            item_id,
-            count(*) AS matches,
-            countIf(won) AS wins
-        FROM match_player_item_v2
-        INNER JOIN default.match_info AS mi USING (match_id)
-        WHERE account_id IN %(account_ids)s
-        AND mi.match_outcome = 'TeamWin'
-        AND mi.match_mode IN ('Ranked', 'Unranked')
-        AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
-        AND (%(item_id)s IS NULL OR item_id = %(item_id)s)
-        AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
-        AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
-        AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        GROUP BY account_id, hero_id, item_id
-        ORDER BY account_id, hero_id, item_id;
+    WITH matches AS (
+            SELECT match_id
+            FROM match_info
+            WHERE match_outcome = 'TeamWin'
+                AND match_mode IN ('Ranked', 'Unranked')
+                AND game_mode = 'Normal'
+                AND (%(min_unix_timestamp)s IS NULL OR start_time >= toDateTime(%(min_unix_timestamp)s))
+                AND (%(max_unix_timestamp)s IS NULL OR start_time <= toDateTime(%(max_unix_timestamp)s))
+            ),
+        players AS (
+            SELECT account_id, hero_id, items.item_id as items, won
+            FROM match_player
+            PREWHERE account_id IN %(account_ids)s
+            WHERE match_id IN (SELECT match_id FROM matches)
+                AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
+            )
+    SELECT
+        account_id,
+        hero_id,
+        item_id,
+        count() AS matches,
+        sum(won) AS wins
+    FROM players
+        ARRAY JOIN items as item_id
+    GROUP BY account_id, hero_id, item_id
+    ORDER BY account_id, hero_id, item_id
     """
     with CH_POOL.get_client() as client:
         result, keys = client.execute(
@@ -774,7 +781,6 @@ def get_player_item_stats_batch(
                 "item_id": item_id,
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
-                "match_mode": match_mode,
             },
             with_column_types=True,
         )
@@ -807,7 +813,6 @@ def get_player_item_stats(
     item_id: int | None = None,
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
 ) -> list[PlayerItemStat]:
     return get_player_item_stats_batch(
         req,
@@ -817,7 +822,6 @@ def get_player_item_stats(
         item_id=item_id,
         min_unix_timestamp=min_unix_timestamp,
         max_unix_timestamp=max_unix_timestamp,
-        match_mode=match_mode,
     )[account_id]
 
 
