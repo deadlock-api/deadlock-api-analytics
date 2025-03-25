@@ -3,26 +3,25 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Path, Query
-from starlette.datastructures import URL
-from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response
-from starlette.status import HTTP_301_MOVED_PERMANENTLY
-
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
 from deadlock_analytics_api.routers.v2_models import (
+    HeroCombsWinLossStat,
+    HeroMatchUpWinLossStat,
+    HeroMatchUpWinLossStatMatchUp,
     PlayerCardHistoryEntry,
     PlayerHeroStat,
     PlayerItemStat,
     PlayerLeaderboardV2,
     PlayerMMRHistoryEntryV2,
-    HeroCombsWinLossStat,
-    HeroMatchUpWinLossStat,
-    HeroMatchUpWinLossStatMatchUp,
 )
+from fastapi import APIRouter, HTTPException, Path, Query
+from starlette.datastructures import URL
+from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response
+from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 router = APIRouter(prefix="/v2", tags=["V2"])
 
@@ -310,7 +309,16 @@ def get_hero_combs_win_loss_stats(
     return comb_stats
 
 
-@router.get("/hero-matchups-win-loss-stats", summary="RateLimit: 100req/s")
+@router.get(
+    "/hero-matchups-win-loss-stats",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/analytics/hero-counter-stats
+    """,
+    deprecated=True,
+)
 def get_hero_matchups_win_loss_stats(
     req: Request,
     res: Response,
@@ -340,8 +348,7 @@ def get_hero_matchups_win_loss_stats(
             sumIf(assists, team = 'Team0')        AS team0_assists,
             sumIf(assists, team = 'Team1')        AS team1_assists
         FROM match_player FINAL
-        INNER JOIN match_info mi USING (match_id)
-        INNER JOIN player p USING (account_id)
+            INNER ANY JOIN match_info mi USING (match_id)
         WHERE 1=1
         AND mi.match_outcome = 'TeamWin'
         AND mi.match_mode IN ('Ranked', 'Unranked')
@@ -350,7 +357,6 @@ def get_hero_matchups_win_loss_stats(
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
         GROUP BY match_id, assigned_lane
         HAVING length(team0_hero_id) = 1
         AND length(team1_hero_id) = 1
