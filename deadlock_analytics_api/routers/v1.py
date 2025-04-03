@@ -100,32 +100,6 @@ def get_match_badge_level_distribution(req: Request) -> RedirectResponse:
     return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
-class RegionDistribution(BaseModel):
-    region: str
-    count: int
-
-
-@router.get(
-    "/match-region-distribution",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_match_region_distribution(req: Request, res: Response) -> list[RegionDistribution]:
-    limiter.apply_limits(
-        req, res, "/v1/match-region-distribution", [RateLimit(limit=100, period=1)]
-    )
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    query = """
-    SELECT region_mode, COUNT(DISTINCT match_id) as count
-    FROM active_matches
-    GROUP BY region_mode
-    ORDER BY region_mode;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query)
-    return [RegionDistribution(region=row[0], count=row[1]) for row in result]
-
-
 class HeroLeaderboard(BaseModel):
     hero_id: int
     account_id: int
@@ -810,13 +784,12 @@ def get_leaderboard_by_region(
     query = """
     SELECT account_id, player_score, row_number() OVER (ORDER BY player_score DESC) as rank, matches_played, ranked_badge_level
     FROM leaderboard
-    WHERE region_mode = %(region)s
     ORDER BY rank
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"start": start - 1, "limit": limit, "region": region})
+        result = client.execute(query, {"start": start - 1, "limit": limit})
     return [
         PlayerLeaderboardV1(
             account_id=r[0],

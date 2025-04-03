@@ -57,11 +57,10 @@ def get_leaderboard(
         "matches_played": "ORDER BY matches_played DESC, rank",
     }[sort_by or "winrate"]
     query = f"""
-    SELECT account_id, region_mode, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
+    SELECT account_id, rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
     FROM leaderboard_v2
     WHERE (%(account_id)s IS NULL OR account_id = %(account_id)s)
     {order_by_clause}
-    LIMIT 1 by account_id
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
@@ -72,14 +71,14 @@ def get_leaderboard(
     return [
         PlayerLeaderboardV2(
             account_id=r[0],
-            region_mode=r[1],
-            leaderboard_rank=r[2],
-            ranked_badge_level=r[3],
-            wins=r[4],
-            matches_played=r[5],
-            kills=r[6],
-            deaths=r[7],
-            assists=r[8],
+            region_mode=None,
+            leaderboard_rank=r[1],
+            ranked_badge_level=r[2],
+            wins=r[3],
+            matches_played=r[4],
+            kills=r[5],
+            deaths=r[6],
+            assists=r[7],
         )
         for r in result
     ]
@@ -112,26 +111,24 @@ def get_leaderboard_by_region(
         "matches_played": "ORDER BY matches_played DESC, rank",
     }[sort_by or "winrate"]
     query = f"""
-    SELECT account_id, region_mode, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
+    SELECT account_id, rank() OVER (ORDER BY ranked_badge_level DESC) as rank, ranked_badge_level, wins, matches_played, kills, deaths, assists
     FROM leaderboard_v2
-    WHERE region_mode = %(region)s
     {order_by_clause}
     LIMIT %(limit)s
     OFFSET %(start)s;
     """
     with CH_POOL.get_client() as client:
-        result = client.execute(query, {"start": start - 1, "limit": limit, "region": region})
+        result = client.execute(query, {"start": start - 1, "limit": limit})
     return [
         PlayerLeaderboardV2(
             account_id=r[0],
-            region_mode=r[1],
-            leaderboard_rank=r[2],
-            ranked_badge_level=r[3],
-            wins=r[4],
-            matches_played=r[5],
-            kills=r[6],
-            deaths=r[7],
-            assists=r[8],
+            leaderboard_rank=r[1],
+            ranked_badge_level=r[2],
+            wins=r[3],
+            matches_played=r[4],
+            kills=r[5],
+            deaths=r[6],
+            assists=r[7],
         )
         for r in result
     ]
@@ -157,7 +154,6 @@ def get_hero_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> RedirectResponse:
     url = URL("https://api.deadlock-api.com/v1/analytics/hero-win-loss-stats")
     url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
