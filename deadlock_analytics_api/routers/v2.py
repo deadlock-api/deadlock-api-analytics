@@ -332,7 +332,6 @@ def get_hero_matchups_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[HeroMatchUpWinLossStat]:
     limiter.apply_limits(
         req, res, "/v2/hero-matchup-win-loss-stats", [RateLimit(limit=100, period=1)]
@@ -390,7 +389,6 @@ def get_hero_matchups_win_loss_stats(
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
                 "match_mode": match_mode,
-                "region": region,
             },
         )
     matchups = defaultdict(list)
@@ -456,7 +454,6 @@ def get_item_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> RedirectResponse:
     url = URL("https://api.deadlock-api.com/v1/analytics/item-win-loss-stats")
     url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
@@ -483,7 +480,6 @@ def get_hero_item_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> RedirectResponse:
     url = URL("https://api.deadlock-api.com/v1/analytics/item-win-loss-stats")
     url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
