@@ -28,8 +28,13 @@ router = APIRouter(prefix="/v2", tags=["V2"])
 
 @router.get(
     "/leaderboard",
-    response_model_exclude_none=True,
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/scoreboard
+    """,
+    deprecated=True,
 )
 def get_leaderboard(
     req: Request,
@@ -82,8 +87,13 @@ def get_leaderboard(
 
 @router.get(
     "/leaderboard/{region}",
-    response_model_exclude_none=True,
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/scoreboard
+    """,
+    deprecated=True,
 )
 def get_leaderboard_by_region(
     req: Request,

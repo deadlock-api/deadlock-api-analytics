@@ -742,9 +742,13 @@ class PlayerLeaderboardV1(BaseModel):
 
 @router.get(
     "/leaderboard",
-    response_model_exclude_none=True,
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/scoreboard
+    """,
     deprecated=True,
-    summary="RateLimit: 100req/s",
 )
 def get_leaderboard(
     req: Request,
@@ -786,9 +790,13 @@ def get_leaderboard(
 
 @router.get(
     "/leaderboard/{region}",
-    response_model_exclude_none=True,
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/scoreboard
+    """,
     deprecated=True,
-    summary="RateLimit: 100req/s",
 )
 def get_leaderboard_by_region(
     req: Request,
