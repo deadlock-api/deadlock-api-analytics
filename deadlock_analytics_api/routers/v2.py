@@ -187,7 +187,6 @@ def get_hero_combs_win_loss_stats(
     min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
     max_unix_timestamp: int | None = None,
     match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
 ) -> list[HeroCombsWinLossStat]:
     limiter.apply_limits(
         req, res, "/v2/hero-combs-win-loss-stats", [RateLimit(limit=100, period=1)]
@@ -227,7 +226,6 @@ def get_hero_combs_win_loss_stats(
             sum(assists) AS assists
         FROM match_player FINAL
         INNER JOIN match_info mi USING (match_id)
-        INNER JOIN player p USING (account_id)
         WHERE 1=1
         AND mi.match_outcome = 'TeamWin'
         AND mi.match_mode IN ('Ranked', 'Unranked')
@@ -236,7 +234,6 @@ def get_hero_combs_win_loss_stats(
         AND (%(min_unix_timestamp)s IS NULL OR mi.start_time >= toDateTime(%(min_unix_timestamp)s))
         AND (%(max_unix_timestamp)s IS NULL OR mi.start_time <= toDateTime(%(max_unix_timestamp)s))
         AND (%(match_mode)s IS NULL OR mi.match_mode = %(match_mode)s)
-        AND (%(region)s IS NULL OR p.region_mode = %(region)s)
         GROUP BY match_id, team
     )
     SELECT
@@ -262,7 +259,6 @@ def get_hero_combs_win_loss_stats(
                 "min_unix_timestamp": min_unix_timestamp,
                 "max_unix_timestamp": max_unix_timestamp,
                 "match_mode": match_mode,
-                "region": region,
                 "include_hero_ids": include_hero_ids,
                 "exclude_hero_ids": exclude_hero_ids,
             },
