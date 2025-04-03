@@ -110,6 +110,7 @@ class HeroLeaderboard(BaseModel):
 @router.get(
     "/hero-leaderboard/{hero_id}",
     summary="RateLimit: 100req/s",
+    deprecated=True,
 )
 def get_hero_leaderboard(
     req: Request,
