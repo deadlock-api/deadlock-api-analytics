@@ -69,21 +69,6 @@ def get_match_score_distribution(req: Request, res: Response) -> list[MatchScore
     return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
 
 
-# class MatchBadgeLevelDistribution(BaseModel):
-#     match_badge_level: int
-#     count: int
-#
-#     @computed_field
-#     @property
-#     def match_ranked_rank(self) -> int | None:
-#         return self.match_badge_level // 10 if self.match_badge_level is not None else None
-#
-#     @computed_field
-#     @property
-#     def match_ranked_subrank(self) -> int | None:
-#         return self.match_badge_level % 10 if self.match_badge_level is not None else None
-
-
 @router.get(
     "/match-badge-level-distribution",
     summary="Moved to new API: https://api.deadlock-api.com/",
@@ -479,7 +464,7 @@ def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveM
 
 @router.get(
     "/matches/{match_id}/metadata",
-    description="# Moved to Data API",
+    description="# Moved to new API",
     deprecated=True,
 )
 def get_match_metadata(match_id: int) -> RedirectResponse:
@@ -491,7 +476,7 @@ def get_match_metadata(match_id: int) -> RedirectResponse:
 
 @router.get(
     "/matches/{match_id}/raw_metadata",
-    description="# Moved to Data API",
+    description="# Moved to new API",
     deprecated=True,
     include_in_schema=False,
 )
@@ -879,165 +864,6 @@ def get_player_mmr_history(
         )
         for r in result
     ]
-
-
-# class ItemCombWinRateEntry(BaseModel):
-#     item_ids: list[int]
-#     wins: int
-#     total: int
-#     unique_users: int
-#     min_distance: int | None
-#     max_distance: int | None
-#
-#     @computed_field
-#     @property
-#     def win_rate(self) -> float:
-#         if self.total == 0:
-#             return 0.0
-#         return round(self.wins / self.total, 2)
-
-
-# @router.get("/dev/item-win-rate-analysis/by-similarity", summary="RateLimit: 100req/s")
-# def get_item_comb_win_rate_by_similarity(
-#     req: Request,
-#     res: Response,
-#     item_ids: str | None = None,
-#     build_id: int | None = None,
-#     hero_id: int | None = None,
-#     min_badge_level: int | None = None,
-#     max_badge_level: int | None = None,
-#     min_match_id: int | None = None,
-#     max_match_id: int | None = None,
-#     min_unix_timestamp: int | None = None,
-#     max_unix_timestamp: int | None = None,
-#     min_used_items: int | None = None,
-#     max_distance: Annotated[int | None, Query(ge=0, le=1000)] = None,
-#     max_unused_items: Annotated[int | None, Query(ge=0)] = None,
-#     distance_function: Literal["L1", "cosine", "non_matching_build_items", "non_matching_items"]
-#     | None = None,
-#     k_most_similar_builds: Annotated[int, Query(ge=1, le=100000)] = 10000,
-# ) -> ItemCombWinRateEntry:
-#     limiter.apply_limits(
-#         req,
-#         res,
-#         "/v1/dev/item-win-rate-analysis/by-similarity",
-#         [RateLimit(limit=100, period=1)],
-#     )
-#     res.headers["Cache-Control"] = "public, max-age=1800"
-#     if item_ids is None and build_id is None:
-#         raise HTTPException(status_code=400, detail="Either item_ids or build_id must be provided")
-#     if item_ids is not None and build_id is not None:
-#         raise HTTPException(
-#             status_code=400, detail="Only one of item_ids or build_id can be provided"
-#         )
-#     if item_ids is not None:
-#         try:
-#             item_ids = [int(i) for i in item_ids.split(",")]
-#         except ValueError:
-#             raise HTTPException(status_code=400, detail="Invalid item_ids, must be comma separated")
-#     if item_ids is None and build_id is not None:
-#         build = requests.get(f"https://data.deadlock-api.com/v1/builds/{build_id}")
-#         if build.status_code != 200:
-#             raise HTTPException(status_code=404, detail="Build not found")
-#         build = build.json()
-#         mod_categories = build["hero_build"]["details"]["mod_categories"]
-#         item_ids = list({i["ability_id"] for c in mod_categories for i in c.get("mods", [])})
-#
-#     max_unused_items_filter = "AND TRUE"
-#     distance_func_query: str | None = distance_function
-#     if distance_function is None or distance_function == "L1":
-#         distance_func_query = "L1Distance(encoded_build_items, encoded_items)"
-#     elif distance_function == "cosine":
-#         distance_func_query = "cosineDistance(encoded_build_items, encoded_items)"
-#     elif distance_function == "non_matching_build_items":
-#         distance_func_query = (
-#             "arraySum(encoded_build_items) - arrayDotProduct(encoded_build_items, encoded_items)"
-#         )
-#         if max_unused_items:
-#             max_unused_items_filter = (
-#                 f"AND arraySum(encoded_items) - arraySum(encoded_build_items) <= {max_unused_items}"
-#             )
-#     elif distance_function == "non_matching_items":
-#         distance_func_query = (
-#             "arraySum(encoded_items) - arrayDotProduct(encoded_build_items, encoded_items)"
-#         )
-#         if max_unused_items:
-#             max_unused_items_filter = (
-#                 f"AND arraySum(encoded_build_items) - arraySum(encoded_items) <= {max_unused_items}"
-#             )
-#     else:
-#         raise HTTPException(status_code=400, detail="Invalid distance_function")
-#
-#     if min_unix_timestamp is not None:
-#         query = "SELECT match_id FROM match_info WHERE start_time >= toDateTime(%(min_unix_timestamp)s) ORDER BY match_id LIMIT 1"
-#         with CH_POOL.get_client() as client:
-#             result = client.execute(query, {"min_unix_timestamp": min_unix_timestamp})
-#         if len(result) >= 1:
-#             min_match_id = (
-#                 max(min_match_id, result[0][0]) if min_match_id is not None else result[0][0]
-#             )
-#
-#     if max_unix_timestamp is not None:
-#         query = "SELECT match_id FROM match_info WHERE start_time <= toDateTime(%(max_unix_timestamp)s) ORDER BY match_id DESC LIMIT 1"
-#         with CH_POOL.get_client() as client:
-#             result = client.execute(query, {"max_unix_timestamp": max_unix_timestamp})
-#         if len(result) >= 1:
-#             max_match_id = (
-#                 min(max_match_id, result[0][0]) if max_match_id is not None else result[0][0]
-#             )
-#
-#     if min_match_id is not None and max_match_id is not None and min_match_id > max_match_id:
-#         raise HTTPException(status_code=400, detail="min_match_id must be less than max_match_id")
-#
-#     query = f"""
-#     WITH
-#         all_items as (SELECT groupUniqArray(item_id) as items_arr FROM items),
-#         build_items as (SELECT arrayMap(x -> toBool(has(%(item_ids)s, x)), arraySort(items_arr)) as encoded_build_items FROM all_items),
-#         relevant_matches as (
-#             SELECT account_id, won, {distance_func_query} as distance
-#             FROM match_player_encoded_items
-#                 CROSS JOIN build_items
-#             WHERE 1=1
-#                 AND (%(hero_id)s IS NULL OR hero_id = %(hero_id)s)
-#                 AND (%(min_badge_level)s IS NULL OR average_badge >= %(min_badge_level)s)
-#                 AND (%(max_badge_level)s IS NULL OR average_badge <= %(max_badge_level)s)
-#                 AND (%(min_match_id)s IS NULL OR match_id >= %(min_match_id)s)
-#                 AND (%(max_match_id)s IS NULL OR match_id <= %(max_match_id)s)
-#                 AND (%(max_distance)s IS NULL OR distance <= %(max_distance)s)
-#                 AND (%(min_used_items)s IS NULL OR arraySum(encoded_items) >= %(min_used_items)s)
-#                 {max_unused_items_filter}
-#             ORDER BY distance
-#             LIMIT %(limit)s
-#         )
-#     SELECT sum(won) as wins, count() as total, COUNT(DISTINCT account_id) as unique_accounts, min(distance) as min_distance, max(distance) as max_distance
-#     FROM relevant_matches
-#     """
-#     with CH_POOL.get_client() as client:
-#         result = client.execute(
-#             query,
-#             {
-#                 "item_ids": item_ids,
-#                 "hero_id": hero_id,
-#                 "min_badge_level": min_badge_level,
-#                 "max_badge_level": max_badge_level,
-#                 "min_match_id": min_match_id,
-#                 "max_match_id": max_match_id,
-#                 "max_distance": max_distance,
-#                 "min_used_items": min_used_items,
-#                 "limit": k_most_similar_builds,
-#             },
-#         )
-#     if len(result) == 0:
-#         raise HTTPException(status_code=404, detail="No matches found")
-#     result = result[0]
-#     return ItemCombWinRateEntry(
-#         item_ids=item_ids,
-#         wins=result[0] or 0,
-#         total=result[1] or 0,
-#         unique_users=result[2] or 0,
-#         min_distance=result[3],
-#         max_distance=result[4],
-#     )
 
 
 class ItemWinRateEntry(BaseModel):

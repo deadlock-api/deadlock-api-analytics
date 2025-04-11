@@ -28,21 +28,6 @@ class PlayerLeaderboardV2(BaseModel):
         return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
-# class HeroItemWinLossStat(BaseModel):
-#     hero_id: int
-#     item_id: int
-#     wins: int
-#     losses: int
-#     matches: int
-
-
-# class ItemWinLossStat(BaseModel):
-#     item_id: int
-#     wins: int
-#     losses: int
-#     matches: int
-
-
 class PlayerCardSlot(BaseModel):
     slots_id: int | None
     hero_id: int | None
@@ -128,30 +113,6 @@ class PlayerItemStat(BaseModel):
     item_id: int
     wins: int
     matches: int
-
-
-# class PlayerMate(BaseModel):
-#     mate_id: int = Field(description="The account id of the mate, it's a SteamID3")
-#     wins: int
-#     matches_played: int
-#     matches: list[int]
-
-
-# class PlayerParty(BaseModel):
-#     party_size: int
-#     wins: int
-#     matches_played: int
-#     matches: list[int]
-
-
-# class HeroWinLossStatV2(BaseModel):
-#     hero_id: int
-#     wins: int
-#     losses: int
-#     matches: int
-#     total_kills: int = Field(description="The total number of kills over all matches")
-#     total_deaths: int = Field(description="The total number of deaths over all matches")
-#     total_assists: int = Field(description="The total number of assists over all matches")
 
 
 class HeroCombsWinLossStat(BaseModel):

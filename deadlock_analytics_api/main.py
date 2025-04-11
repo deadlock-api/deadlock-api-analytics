@@ -11,7 +11,6 @@ from starlette.responses import FileResponse, RedirectResponse
 from deadlock_analytics_api.logging_middleware import RouterLoggingMiddleware
 from deadlock_analytics_api.routers import v1, v2
 
-# Doesn't use AppConfig because logging is critical
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "DEBUG"))
 logging.config.dictConfig(
     {
