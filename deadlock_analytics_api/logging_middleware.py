@@ -36,7 +36,7 @@ class RouterLoggingMiddleware(BaseHTTPMiddleware):
         if req.query_params:
             path += f"?{req.query_params}"
 
-        request_logging = {"method": req.method, "path": path, "ip": req.client.host}
+        request_logging = {"path": path}
 
         try:
             api_key = req.headers.get("X-API-Key", req.query_params.get("api_key"))
