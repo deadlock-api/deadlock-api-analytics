@@ -788,82 +788,23 @@ def get_leaderboard_by_region(
     ]
 
 
-class PlayerMMRHistoryEntry(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    match_id: int
-    match_start_time: str
-    region_mode: str | None = Field(None)
-    player_score: int
-    match_ranked_badge_level: int | None = Field(None)
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level // 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
-        return (
-            self.match_ranked_badge_level % 10
-            if self.match_ranked_badge_level is not None
-            else None
-        )
-
-
 @router.get(
     "/players/{account_id}/mmr-history",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/mmr-history
+    """,
     deprecated=True,
-    summary="RateLimit: 100req/s",
 )
 def get_player_mmr_history(
     req: Request,
-    res: Response,
     account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
-) -> list[PlayerMMRHistoryEntry]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/players/{account_id}/mmr-history",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    account_id = utils.validate_steam_id(account_id)
-    query = """
-    SELECT account_id, match_id, ROUND(player_score), ranked_badge_level
-    FROM mmr_history FINAL
-    WHERE account_id = %(account_id)s
-    ORDER BY match_id DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    match_ids = [r[1] for r in result]
-    query = """
-    SELECT match_id, start_time, region_mode
-    FROM active_matches
-    WHERE match_id IN %(match_ids)s
-    LIMIT 1 BY match_id;
-    """
-    with CH_POOL.get_client() as client:
-        result2 = client.execute(query, {"match_ids": match_ids})
-    match_id_start_time = {r[0]: (r[1], r[2]) for r in result2}
-    return [
-        PlayerMMRHistoryEntry(
-            account_id=r[0],
-            match_id=r[1],
-            match_start_time=match_id_start_time[r[1]][0].isoformat(),
-            region_mode=match_id_start_time[r[1]][1],
-            player_score=r[2],
-            match_ranked_badge_level=r[3],
-        )
-        for r in result
-    ]
+) -> RedirectResponse:
+    url = URL(f"https://api.deadlock-api.com/v1/players/{account_id}/mmr-history")
+    url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
+    return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
 class ItemWinRateEntry(BaseModel):
