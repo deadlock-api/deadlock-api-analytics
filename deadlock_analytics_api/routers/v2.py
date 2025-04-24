@@ -15,7 +15,6 @@ from deadlock_analytics_api.routers.v2_models import (
     PlayerHeroStat,
     PlayerItemStat,
     PlayerLeaderboardV2,
-    PlayerMMRHistoryEntryV2,
 )
 from fastapi import APIRouter, HTTPException, Path, Query
 from starlette.datastructures import URL
@@ -869,65 +868,22 @@ def get_player_card_history(
 
 
 @router.get(
-    "/players/mmr-history",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_player_mmr_history_batch(
-    req: Request,
-    res: Response,
-    account_ids: Annotated[
-        str,
-        Query(description="Comma separated account ids of the players, at most 100 allowed"),
-    ],
-) -> list[list[PlayerMMRHistoryEntryV2]]:
-    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
-    if len(account_ids) > 100:
-        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
-
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/players/mmr-history",
-        [RateLimit(limit=100, period=1)],
-        count=len(account_ids),
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT match_id, won, 'metadata' as source
-    FROM match_player
-    WHERE account_id IN %(account_ids)s
-    ORDER BY match_id DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_ids": account_ids})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    return [
-        [
-            PlayerMMRHistoryEntryV2(
-                account_id=account_id,
-                match_id=r[0],
-                won=r[1],
-                source=r[2],
-            )
-            for r in result
-        ]
-        for account_id in account_ids
-    ]
-
-
-@router.get(
     "/players/{account_id}/mmr-history",
-    summary="RateLimit: 100req/s",
+    summary="Moved to new API: https://api.deadlock-api.com/",
+    description="""
+# Endpoint moved to new API
+- New API Docs: https://api.deadlock-api.com/docs
+- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/mmr-history
+    """,
     deprecated=True,
 )
 def get_player_mmr_history(
     req: Request,
-    res: Response,
     account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
-) -> list[PlayerMMRHistoryEntryV2]:
-    return get_player_mmr_history_batch(req, res, account_ids=str(account_id))[0]
+) -> RedirectResponse:
+    url = URL(f"https://api.deadlock-api.com/v1/players/{account_id}/mmr-history")
+    url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
+    return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
 
 
 @router.get(

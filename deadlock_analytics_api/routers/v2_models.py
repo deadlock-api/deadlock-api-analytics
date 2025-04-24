@@ -76,13 +76,6 @@ class PlayerCardHistoryEntry(BaseModel):
         return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 
-class PlayerMMRHistoryEntryV2(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    match_id: int
-    won: bool = Field(False)
-    source: str
-
-
 class PlayerHeroStat(BaseModel):
     account_id: int = Field(description="The account id of the player, it's a SteamID3")
     hero_id: int
