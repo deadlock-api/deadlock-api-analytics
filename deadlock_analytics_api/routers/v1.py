@@ -4,6 +4,15 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 
 from clickhouse_driver import Client
+from fastapi import APIRouter, Depends, Path, Query
+from fastapi.openapi.models import APIKey
+from pydantic import BaseModel, Field, computed_field, field_validator
+from starlette.datastructures import URL
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import RedirectResponse, Response, StreamingResponse
+from starlette.status import HTTP_301_MOVED_PERMANENTLY
+
 from deadlock_analytics_api import utils
 from deadlock_analytics_api.globs import CH_POOL
 from deadlock_analytics_api.models.active_match import (
@@ -13,14 +22,6 @@ from deadlock_analytics_api.models.active_match import (
 )
 from deadlock_analytics_api.rate_limiter import limiter
 from deadlock_analytics_api.rate_limiter.models import RateLimit
-from fastapi import APIRouter, Depends, Path, Query
-from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field, computed_field, field_validator
-from starlette.datastructures import URL
-from starlette.exceptions import HTTPException
-from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response, StreamingResponse
-from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
@@ -829,6 +830,7 @@ def post_win_rate_analysis(
     excluded_item_ids: list[int] | None = None,
     required_item_ids: list[int] | None = None,
     min_badge_level: int = 80,
+    min_unix_timestamp: int = 0,
 ) -> list[ItemWinRateEntry]:
     limiter.apply_limits(
         req,
@@ -841,7 +843,6 @@ def post_win_rate_analysis(
     excluded_item_ids = excluded_item_ids or []
     required_item_ids = required_item_ids or []
 
-    START_TIME = "2025-02-25"
     try:
         with CH_POOL.get_client() as client:
 
@@ -876,7 +877,7 @@ def post_win_rate_analysis(
                     groupArray(item_id) AS items
                 FROM match_player_item_v2 mpi
                 WHERE
-                    mpi.start_time > toDateTime(%(start_time)s)  AND
+                    mpi.start_time > %(start_time)s  AND
                     mpi.hero_id = %(hero_id)s AND
                     mpi.average_match_badge > %(min_badge_level)s
                 GROUP BY match_id, hero_id
@@ -901,7 +902,11 @@ def post_win_rate_analysis(
 
             result = client.execute(
                 query,
-                {"hero_id": hero_id, "min_badge_level": min_badge_level, "start_time": START_TIME},
+                {
+                    "hero_id": hero_id,
+                    "min_badge_level": min_badge_level,
+                    "start_time": min_unix_timestamp,
+                },
             )
 
             entries = []
