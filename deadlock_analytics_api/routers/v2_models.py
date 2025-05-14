@@ -1,7 +1,6 @@
-from datetime import datetime, timezone
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, Field, computed_field
 
 
 class PlayerLeaderboardV2(BaseModel):
@@ -25,54 +24,6 @@ class PlayerLeaderboardV2(BaseModel):
     @computed_field
     @property
     def ranked_subrank(self) -> int | None:
-        return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
-
-
-class PlayerCardSlot(BaseModel):
-    slots_id: int | None
-    hero_id: int | None
-    hero_kills: int | None
-    hero_wins: int | None
-    # stat_id: int # Always 0
-    # stat_score: int # Always 0
-
-
-class PlayerCardHistoryEntry(BaseModel):
-    account_id: int = Field(description="The account id of the player, it's a SteamID3")
-    created_at: datetime
-    slots: list[PlayerCardSlot]
-    ranked_badge_level: int
-
-    @field_validator("created_at", mode="before")
-    @classmethod
-    def utc_created_at(cls, v: datetime) -> datetime:
-        return v.astimezone(timezone.utc)
-
-    @classmethod
-    def from_row(cls, row) -> "PlayerCardHistoryEntry":
-        return cls(
-            slots=[
-                PlayerCardSlot(
-                    **{
-                        k.replace("slots_", "", 1): (v[0] if len(v) > 0 else None)
-                        if isinstance(v, list)
-                        else v
-                        for k, v in row.items()
-                        if k.startswith("slots_")
-                    }
-                )
-            ],
-            **{k: v for k, v in row.items() if not k.startswith("slots_")},
-        )
-
-    @computed_field
-    @property
-    def match_ranked_rank(self) -> int | None:
-        return self.ranked_badge_level // 10 if self.ranked_badge_level is not None else None
-
-    @computed_field
-    @property
-    def match_ranked_subrank(self) -> int | None:
         return self.ranked_badge_level % 10 if self.ranked_badge_level is not None else None
 
 

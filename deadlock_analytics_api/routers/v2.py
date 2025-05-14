@@ -11,7 +11,6 @@ from deadlock_analytics_api.routers.v2_models import (
     HeroCombsWinLossStat,
     HeroMatchUpWinLossStat,
     HeroMatchUpWinLossStatMatchUp,
-    PlayerCardHistoryEntry,
     PlayerHeroStat,
     PlayerItemStat,
     PlayerLeaderboardV2,
@@ -811,60 +810,6 @@ def get_player_party_stats(
     url = URL(f"https://api.deadlock-api.com/v1/players/{account_id}/party-stats")
     url = url.include_query_params(**{k: v for k, v in req.query_params.items() if v is not None})
     return RedirectResponse(url, HTTP_301_MOVED_PERMANENTLY)
-
-
-@router.get(
-    "/players/card-history",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_player_card_history_batch(
-    req: Request,
-    res: Response,
-    account_ids: Annotated[
-        str,
-        Query(description="Comma separated account ids of the players, at most 100 allowed"),
-    ],
-) -> list[list[PlayerCardHistoryEntry]]:
-    account_ids = [utils.validate_steam_id(int(a)) for a in account_ids.split(",")]
-    if len(account_ids) > 100:
-        raise HTTPException(status_code=400, detail="Max 100 account_ids allowed")
-
-    limiter.apply_limits(
-        req,
-        res,
-        "/v2/players/card-history",
-        [RateLimit(limit=100, period=1)],
-        count=len(account_ids),
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    query = """
-    SELECT *
-    FROM player_card
-    WHERE account_id IN %(account_ids)s
-    ORDER BY account_id, created_at DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result, keys = client.execute(query, {"account_ids": account_ids}, with_column_types=True)
-    result = [{k: v for (k, _), v in zip(keys, r)} for r in result]
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Player not found")
-    cards = [PlayerCardHistoryEntry.from_row(r) for r in result]
-    cards_grouped = itertools.groupby(cards, key=lambda x: x.account_id)
-    return [list(cards) for account_id, cards in cards_grouped]
-
-
-@router.get(
-    "/players/{account_id}/card-history",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_player_card_history(
-    req: Request,
-    res: Response,
-    account_id: Annotated[int, Path(description="The account id of the player, it's a SteamID3")],
-) -> list[PlayerCardHistoryEntry]:
-    return get_player_card_history_batch(req, res, account_ids=str(account_id))[0]
 
 
 @router.get(
