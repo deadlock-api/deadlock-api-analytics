@@ -4,11 +4,9 @@ import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import FileResponse, RedirectResponse
 
-from deadlock_analytics_api.logging_middleware import RouterLoggingMiddleware
 from deadlock_analytics_api.routers import v1, v2
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "DEBUG"))
@@ -54,15 +52,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
-app.add_middleware(RouterLoggingMiddleware, logger=LOGGER)
-
-instrumentator = Instrumentator(should_group_status_codes=False).instrument(app)
-
-
-@app.on_event("startup")
-async def _startup():
-    instrumentator.expose(app, include_in_schema=False)
-
 
 app.include_router(v2.router)
 app.include_router(v1.router)

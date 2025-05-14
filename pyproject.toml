@@ -11,10 +11,8 @@ dependencies = [
     "cachetools>=5.5.0",
     "clickhouse-pool>=0.6.0",
     "fastapi>=0.115.5",
-    "prometheus-fastapi-instrumentator>=7.0.0",
     "psycopg2-binary>=2.9.10",
     "redis[hiredis]>=5.2.0",
-    "requests>=2.32.3",
     "uuid>=1.30",
     "uvicorn>=0.34.0",
 ]
