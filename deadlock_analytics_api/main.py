@@ -55,7 +55,6 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 
 app.include_router(v2.router)
 app.include_router(v1.router)
-app.include_router(v1.no_tagged_router)
 
 
 @app.get("/", include_in_schema=False)

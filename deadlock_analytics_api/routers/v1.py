@@ -15,11 +15,8 @@ from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_301_MOVED_PERMANENTLY
 
 router = APIRouter(prefix="/v1", tags=["V1"])
-no_tagged_router = APIRouter(prefix="/v1")
 
 LOGGER = logging.getLogger("app-v1")
-
-LOGGER.setLevel(logging.INFO)
 
 
 @router.get(
