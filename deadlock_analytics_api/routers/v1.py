@@ -1,27 +1,18 @@
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from clickhouse_driver import Client
-from fastapi import APIRouter, Depends, Path, Query
-from fastapi.openapi.models import APIKey
-from pydantic import BaseModel, Field, computed_field, field_validator
+from deadlock_analytics_api import utils
+from deadlock_analytics_api.globs import CH_POOL
+from deadlock_analytics_api.rate_limiter import limiter
+from deadlock_analytics_api.rate_limiter.models import RateLimit
+from fastapi import APIRouter, Path, Query
+from pydantic import BaseModel, Field, computed_field
 from starlette.datastructures import URL
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, Response, StreamingResponse
+from starlette.responses import RedirectResponse, Response
 from starlette.status import HTTP_301_MOVED_PERMANENTLY
-
-from deadlock_analytics_api import utils
-from deadlock_analytics_api.globs import CH_POOL
-from deadlock_analytics_api.models.active_match import (
-    ACTIVE_MATCHES_KEYS,
-    ACTIVE_MATCHES_REDUCED_KEYS,
-    ActiveMatch,
-)
-from deadlock_analytics_api.rate_limiter import limiter
-from deadlock_analytics_api.rate_limiter.models import RateLimit
 
 router = APIRouter(prefix="/v1", tags=["V1"])
 no_tagged_router = APIRouter(prefix="/v1")
@@ -43,31 +34,6 @@ LOGGER.setLevel(logging.INFO)
 )
 def get_api_info() -> RedirectResponse:
     return RedirectResponse("https://api.deadlock-api.com/v1/info", HTTP_301_MOVED_PERMANENTLY)
-
-
-class MatchScoreDistribution(BaseModel):
-    match_score: int
-    count: int
-
-
-@router.get(
-    "/match-score-distribution",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-)
-def get_match_score_distribution(req: Request, res: Response) -> list[MatchScoreDistribution]:
-    limiter.apply_limits(req, res, "/v1/match-score-distribution", [RateLimit(limit=100, period=1)])
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    query = """
-    SELECT match_score as score, COUNT(DISTINCT match_id) as match_score_count
-    FROM finished_matches
-    WHERE start_time > '2024-10-11 06:00:00'
-    GROUP BY score
-    ORDER BY score;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query)
-    return [MatchScoreDistribution(match_score=row[0], count=row[1]) for row in result]
 
 
 @router.get(
@@ -129,19 +95,6 @@ def get_hero_leaderboard(
             },
         )
     return [HeroLeaderboard(hero_id=r[0], account_id=r[1], wins=r[2], total=r[3]) for r in result]
-
-
-class MatchSearchResult(BaseModel):
-    match_id: int
-    start_time: datetime
-    duration_s: int
-    match_mode: str
-    game_mode: str
-
-    @field_validator("start_time", mode="before")
-    @classmethod
-    def utc_start_time(cls, v: datetime) -> datetime:
-        return v.astimezone(timezone.utc)
 
 
 @router.get(
@@ -411,66 +364,13 @@ def match_search(
 
 
 @router.get(
-    "/matches/{match_id}/short",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-    include_in_schema=False,
-)
-def match_short(req: Request, res: Response, match_id: int) -> ActiveMatch:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/{match_id}/short",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    query = f"""
-    SELECT {", ".join(ACTIVE_MATCHES_KEYS)}
-    FROM finished_matches
-    WHERE match_id = %(match_id)s
-    LIMIT 1
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"match_id": match_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Match not found")
-    row = result[0]
-    return ActiveMatch.from_row(row)
-
-
-@router.get(
-    "/matches/{match_id}/timestamps",
-    summary="RateLimit: 100req/s",
-    deprecated=True,
-    include_in_schema=False,
-)
-def match_timestamps(req: Request, res: Response, match_id: int) -> list[ActiveMatch]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/{match_id}/timestamps",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    query = f"""
-    SELECT DISTINCT ON(scraped_at) {", ".join(ACTIVE_MATCHES_KEYS)}
-    FROM active_matches
-    WHERE match_id = %(match_id)s
-    ORDER BY scraped_at
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"match_id": match_id})
-    return [ActiveMatch.from_row(row) for row in result]
-
-
-@router.get(
     "/matches/{match_id}/metadata",
     description="# Moved to new API",
     deprecated=True,
 )
 def get_match_metadata(match_id: int) -> RedirectResponse:
     return RedirectResponse(
-        url=f"https://data.deadlock-api.com/v1/matches/{match_id}/metadata",
+        url=f"https://api.deadlock-api.com/v1/matches/{match_id}/metadata",
         status_code=HTTP_301_MOVED_PERMANENTLY,
     )
 
@@ -483,204 +383,9 @@ def get_match_metadata(match_id: int) -> RedirectResponse:
 )
 def get_raw_metadata_file(match_id: int) -> RedirectResponse:
     return RedirectResponse(
-        url=f"https://api.deadlock-api.com/v1/matches/{match_id}/metadata",
+        url=f"https://api.deadlock-api.com/v1/matches/{match_id}/metadata/raw",
         status_code=HTTP_301_MOVED_PERMANENTLY,
     )
-
-
-@no_tagged_router.get(
-    "/matches/short",
-    summary="RateLimit: 10req/min 100req/hour, Apply for an API-Key with data access",
-    tags=["Data API-Key required"],
-    deprecated=True,
-    include_in_schema=False,
-)
-def get_all_finished_matches(
-    req: Request,
-    res: Response,
-    api_key: APIKey = Depends(utils.get_data_api_key),
-    limit: int | None = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=1728626400)] = None,
-    max_unix_timestamp: int | None = None,
-    min_match_id: Annotated[int | None, Query(ge=0)] = None,
-    max_match_id: int | None = None,
-    min_match_score: Annotated[int | None, Query(ge=0)] = None,
-    max_match_score: int | None = None,
-    match_mode: Literal["Ranked", "Unranked"] | None = None,
-    region: (Literal["Row", "Europe", "SEAsia", "SAmerica", "Russia", "Oceania"] | None) = None,
-    hero_id: int | None = None,
-) -> StreamingResponse:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches",
-        [RateLimit(limit=10, period=60), RateLimit(limit=100, period=3600)],
-    )
-    res.headers["Cache-Control"] = "private, max-age=3600"
-    print(f"Authenticated with API key: {api_key}")
-    if min_unix_timestamp is None:
-        min_unix_timestamp = 1728626400
-    min_unix_timestamp = max(min_unix_timestamp, 1728626400)
-    if max_unix_timestamp is None:
-        max_unix_timestamp = 4070908800
-    if min_match_id is None:
-        min_match_id = 0
-    if max_match_id is None:
-        max_match_id = 999999999
-    if min_match_score is None:
-        min_match_score = 0
-    if max_match_score is None:
-        max_match_score = 5000
-    query = f"""
-    SELECT {", ".join(ACTIVE_MATCHES_REDUCED_KEYS)}
-    FROM finished_matches
-    ARRAY JOIN players
-    WHERE start_time BETWEEN toDateTime(%(min_unix_timestamp)s) AND toDateTime(%(max_unix_timestamp)s)
-    AND match_id >= %(min_match_id)s AND match_id <= %(max_match_id)s
-    AND match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
-    AND (%(region)s IS NULL OR region_mode = %(region)s)
-    AND (%(hero_id)s IS NULL OR players.hero_id = %(hero_id)s)
-    AND (%(match_mode)s IS NULL OR match_mode = %(match_mode)s)
-    AND start_time < now() - INTERVAL '1 day'
-    LIMIT %(limit)s
-    """
-    client = Client(
-        host=os.getenv("CLICKHOUSE_HOST", "localhost"),
-        port=int(os.getenv("CLICKHOUSE_NATIVE_PORT", 9000)),
-        user=os.getenv("CLICKHOUSE_USERNAME", "default"),
-        password=os.getenv("CLICKHOUSE_PASSWORD", ""),
-        database=os.getenv("CLICKHOUSE_DBNAME", "default"),
-    )
-
-    async def stream():
-        is_first = True
-        for row in client.execute_iter(
-            query,
-            {
-                "limit": limit if limit is not None and limit > 0 else 100_000_000,
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-                "min_match_id": min_match_id,
-                "max_match_id": max_match_id,
-                "min_match_score": min_match_score,
-                "max_match_score": max_match_score,
-                "region": region,
-                "hero_id": hero_id,
-                "match_mode": match_mode,
-            },
-            settings={
-                "max_block_size": 1000000,
-            },
-            with_column_types=True,
-        ):
-            if is_first:
-                is_first = False
-                yield (",".join(c for (c, _) in row) + "\n").encode()
-                continue
-            yield (
-                ",".join(
-                    str(c)
-                    if not isinstance(c, datetime)
-                    else c.astimezone(timezone.utc).isoformat()
-                    for c in row
-                )
-                + "\n"
-            ).encode()
-
-    return StreamingResponse(stream())
-
-
-@router.get(
-    "/matches/by-account-id/{account_id}",
-    summary="Moved to new API: https://api.deadlock-api.com/",
-    description="""
-# Endpoint moved to new API
-- New API Docs: https://api.deadlock-api.com/docs
-- New API Endpoint: https://api.deadlock-api.com/v1/players/{account_id}/match-history
-    """,
-    deprecated=True,
-    include_in_schema=False,
-)
-def get_matches_by_account_id(req: Request, res: Response, account_id: int) -> list[dict]:
-    limiter.apply_limits(
-        req,
-        res,
-        "/v1/matches/by-account-id/{account_id}",
-        [RateLimit(limit=100, period=1)],
-    )
-    res.headers["Cache-Control"] = "public, max-age=300"
-    account_id = utils.validate_steam_id(account_id)
-    query = """
-    SELECT match_id, start_time, ranked_badge_level
-    FROM finished_matches
-    ARRAY JOIN players
-    WHERE players.account_id = %(account_id)s
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(query, {"account_id": account_id})
-    if len(result) == 0:
-        raise HTTPException(status_code=404, detail="Not found")
-    return [
-        {
-            "match_id": r[0],
-            "start_time": r[1].astimezone(timezone.utc),
-            "ranked_badge_level": r[2],
-        }
-        for r in result
-    ]
-
-
-class HeroWinLossStat(BaseModel):
-    hero_id: int
-    wins: int
-    losses: int
-    matches: int
-
-
-@router.get("/hero-win-loss-stats", summary="RateLimit: 100req/s", deprecated=True)
-def get_hero_win_loss_stats(
-    req: Request,
-    res: Response,
-    min_match_score: Annotated[int | None, Query(ge=0)] = None,
-    max_match_score: Annotated[int | None, Query(le=3000)] = None,
-    min_unix_timestamp: Annotated[int | None, Query(ge=0)] = None,
-    max_unix_timestamp: Annotated[int | None, Query(le=4070908800)] = None,
-) -> list[HeroWinLossStat]:
-    limiter.apply_limits(req, res, "/v1/hero-win-loss-stats", [RateLimit(limit=100, period=1)])
-    if min_match_score is None:
-        min_match_score = 0
-    if max_match_score is None:
-        max_match_score = 3000
-    if min_unix_timestamp is None:
-        min_unix_timestamp = 0
-    if max_unix_timestamp is None:
-        max_unix_timestamp = 4070908800
-    res.headers["Cache-Control"] = "public, max-age=1200"
-    query = """
-    SELECT `players.hero_id`                  as hero_id,
-            countIf(`players.team` == winner) AS wins,
-            countIf(`players.team` != winner) AS losses
-    FROM finished_matches
-        ARRAY JOIN players
-    WHERE match_score >= %(min_match_score)s AND match_score <= %(max_match_score)s
-    AND start_time >= toDateTime(%(min_unix_timestamp)s) AND start_time <= toDateTime(%(max_unix_timestamp)s)
-    GROUP BY `players.hero_id`
-    HAVING wins + losses > 100
-    ORDER BY wins + losses DESC;
-    """
-    with CH_POOL.get_client() as client:
-        result = client.execute(
-            query,
-            {
-                "min_match_score": min_match_score,
-                "max_match_score": max_match_score,
-                "min_unix_timestamp": min_unix_timestamp,
-                "max_unix_timestamp": max_unix_timestamp,
-            },
-        )
-    return [
-        HeroWinLossStat(hero_id=r[0], wins=r[1], losses=r[2], matches=r[1] + r[2]) for r in result
-    ]
 
 
 class PlayerLeaderboardV1(BaseModel):

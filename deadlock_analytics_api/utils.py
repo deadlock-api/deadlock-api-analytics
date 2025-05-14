@@ -68,16 +68,6 @@ async def get_api_key(api_key: str = Security(api_key_param)):
     return api_key
 
 
-async def get_data_api_key(api_key: str = Security(api_key_param)):
-    try:
-        if not is_valid_api_key(api_key, True):
-            raise HTTPException(status_code=HTTP_403_FORBIDDEN)
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=HTTP_403_FORBIDDEN)
-    return api_key
-
-
 def is_valid_uuid(value: str) -> bool:
     if value is None:
         return False
